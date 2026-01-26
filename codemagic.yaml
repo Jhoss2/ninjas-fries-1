@@ -1,10 +1,30 @@
-scripts:
+workflows:
+  android-tablet-build:
+    name: Ninja's Fries APK Build
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        - sdk_config
+      node: 18
+      java: 17
+    scripts:
       - name: Install Dependencies
         script: |
           npm install --legacy-peer-deps
       - name: Expo Prebuild
         script: |
+          # Cette commande prépare les dossiers natifs Android
           npx expo prebuild --platform android --no-install
       - name: Build Android APK
         script: |
-          cd android && ./gradlew assembleRelease
+          # On entre dans le dossier généré et on lance la compilation Gradle
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+    publishing:
+      email:
+        recipients:
+          - TON_EMAIL@ICI.COM # Remplace par ton vrai email
