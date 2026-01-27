@@ -3,7 +3,7 @@
     "name": "Ninja's Fries",
     "slug": "ninjas-fries",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -16,18 +16,24 @@
     },
     "android": {
       "package": "com.ninjas.fries",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#09090b"
-      },
+      "minSdkVersion": 24,
       "permissions": [
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
-        "ACCESS_FINE_LOCATION"
-      ],
-      "config": {
-        "minSdkVersion": 24
-      }
-    }
+        "ACCESS_FINE_LOCATION",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT"
+      ]
+    },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermissionDescription": "L'application a besoin du Bluetooth pour imprimer les tickets."
+        }
+      ]
+    ]
   }
 }
