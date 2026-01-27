@@ -8,7 +8,11 @@ import {
   ScrollView,
   Modal,
   StyleSheet,
-  Platform
+  Platform,
+  Dimensions,
+  useWindowDimensions,
+  SafeAreaView,
+  Alert
 } from 'react-native';
 
 import Svg, {
@@ -179,6 +183,10 @@ export const exportOrdersToCSV = async (orderHistory) => {
 };
 
 export default function App() {
+  /* ===================== ADAPTATION ÉCRAN ===================== */
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768; // Détecte si l'appareil est une tablette
+
   /* ===================== ÉTATS ===================== */
   const [view, setView] = useState('menu');
   const [activeIndex, setActiveIndex] = useState(0);
