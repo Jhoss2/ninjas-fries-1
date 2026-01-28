@@ -947,10 +947,29 @@ const styles = StyleSheet.create({
   emptyText:{ textAlign:'center', color:'#444', fontWeight:'900' },
 
   // ... suite et fin du bloc styles (à vérifier dans ton éditeur)
-  carousel:{ height:260, justifyContent:'center', alignItems:'center' },
-  carouselItem:{ position:'absolute' },
-  itemImage:{ width:180, height:180, resizeMode:'contain' },
-  imageFallback:{ width:160, height:160, borderRadius:80, backgroundColor:'#18181b', justifyContent:'center' },
+  carousel: { height: 260, justifyContent: 'center', alignItems: 'center' },
+  carouselItem: { position: 'absolute' },
+  itemImage: { 
+    width: 180, 
+    height: 180, 
+    resizeMode: 'contain',
+    backgroundColor: 'transparent',
+    // --- EFFET HALO LUMINEUX ---
+    shadowColor: "#f97316",    // Utilise le orange de Ninja's Fries
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.4,        // Intensité de la lueur
+    shadowRadius: 25,          // Diffusion du halo
+    elevation: 10              // Pour l'effet d'ombre sur Android
+  },
+  imageFallback: { 
+    width: 160, 
+    height: 160, 
+    borderRadius: 80, 
+    backgroundColor: 'transparent', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#27272a' 
+  },
   // ... (tes autres styles au dessus)
   imageFallbackText:{ textAlign:'center', color:'#555', fontWeight:'900' },
   
