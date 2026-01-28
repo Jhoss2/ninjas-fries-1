@@ -809,7 +809,7 @@ return (
           </View>
         )}
 
-        {/* --- SÉLECTEUR DE SAUCES (Apparaît si on clique sur le bouton Sauces) --- */}
+        {/* --- SÉLECTEUR DE SAUCES AVEC IMAGES --- */}
         {showSaucePicker && (
           <View style={styles.extrasDropdown}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -818,10 +818,15 @@ return (
                   key={s.id} 
                   onPress={() => toggleExtra('sauces', s)}
                   style={[
-                    styles.extraItem, 
+                    styles.extraItemVertical, 
                     selectedExtras.sauces.find(x => x.id === s.id) && styles.extraItemActive
                   ]}
                 >
+                  {s.image ? (
+                    <Image source={{ uri: s.image }} style={styles.extraImageSmall} />
+                  ) : (
+                    <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
+                  )}
                   <Text style={styles.extraItemText}>{s.name}</Text>
                 </Pressable>
               ))}
@@ -829,7 +834,7 @@ return (
           </View>
         )}
 
-        {/* --- SÉLECTEUR DE GARNITURES (Apparaît si on clique sur le bouton Garnitures) --- */}
+        {/* --- SÉLECTEUR DE GARNITURES AVEC IMAGES --- */}
         {showGarniturePicker && (
           <View style={styles.extrasDropdown}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -838,39 +843,21 @@ return (
                   key={g.id} 
                   onPress={() => toggleExtra('garnitures', g)}
                   style={[
-                    styles.extraItem, 
+                    styles.extraItemVertical, 
                     selectedExtras.garnitures.find(x => x.id === g.id) && styles.extraItemActive
                   ]}
                 >
-                  <Text style={styles.extraItemText}>{g.name} (+{g.price} F)</Text>
+                  {g.image ? (
+                    <Image source={{ uri: g.image }} style={styles.extraImageSmall} />
+                  ) : (
+                    <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
+                  )}
+                  <Text style={styles.extraItemText}>{g.name}</Text>
+                  <Text style={styles.extraPriceText}>+{g.price} F</Text>
                 </Pressable>
               ))}
             </ScrollView>
           </View>
-        )}
-
-        {/* Ton bouton commander actuel */}
-        {currentItem && (
-          <Pressable
-            style={styles.orderBtn}
-            onPress={() => {
-              setCart([
-                ...cart,
-                {
-                  ...currentItem,
-                  quantity,
-                  extras: selectedExtras,
-                  totalPrice,
-                  cartId: Date.now()
-                }
-              ]);
-              setView('checkout');
-              resetExtras();
-              setQuantity(1);
-            }}
-          >
-            <Text style={styles.orderText}>COMMANDER</Text>
-          </Pressable>
         )}
       </View>
 
@@ -1038,29 +1025,34 @@ const styles = StyleSheet.create({
   pickerBtn:{ flex:1, borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
   pickerBtnWide:{ flex:1.2, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
   pickerText:{ color:'#777', fontWeight:'900', fontSize:10 },
-  extrasDropdown: {
-    backgroundColor: '#18181b',
-    borderRadius: 15,
+  extraItemVertical: {
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 10,
-    marginVertical: 10,
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#27272a'
-  },
-  extraItem: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 15,
     backgroundColor: '#27272a',
-    marginRight: 10,
+    marginRight: 12,
+    width: 90, // Largeur fixe pour que ce soit bien aligné
   },
-  extraItemActive: {
-    backgroundColor: '#f97316',
+  extraImageSmall: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
+    marginBottom: 5,
   },
-  extraItemText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold'
+  extraImageFallback: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#18181b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  extraPriceText: {
+    color: '#f97316',
+    fontSize: 9,
+    fontWeight: '900',
   },
   qtyBadge:{ width:32, height:32, borderRadius:16, backgroundColor:'#18181b', justifyContent:'center' },
   qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900' },
