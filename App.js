@@ -356,10 +356,16 @@ export default function App() {
   };
 
   setOrderHistory([orderData, ...orderHistory]);
+  
+  // --- GÉNÉRATION DU TEXTE DU TICKET ---
+  const ticketText = generateTicket(orderData); 
+  console.log("Texte prêt pour l'imprimante :\n", ticketText);
+
   setCart([]);
 
   try {
-    await printOrderViaBLE(orderData);
+    // On envoie le texte généré à ton imprimante
+    await printOrderViaBLE(ticketText); 
     console.log('Commande imprimée avec succès');
   } catch (err) {
     console.warn('Impossible d\'imprimer la commande', err);
@@ -378,7 +384,25 @@ export default function App() {
   const handleExportCSV = async () => {
     await exportOrdersToCSV(orderHistory);
   };
+// --- GÉNÉRATEUR DE TEXTE POUR TICKET ---
+  const generateTicket = (order) => {
+    const separator = "--------------------------------";
+    let t = "      NINJA'S FRIES\n";
+    t += `Date: ${order.date} ${order.time}\n`;
+    t += `Commande: #${order.id.toString().slice(-4)}\n`;
+    t += separator + "\n";
 
+    order.items.forEach(it => {
+      t += `${it.quantity}x ${it.name} - ${it.totalPrice} F\n`;
+      if (it.extras.sauces.length > 0) t += ` S: ${it.extras.sauces.map(s => s.name).join(',')}\n`;
+      if (it.extras.garnitures.length > 0) t += ` G: ${it.extras.garnitures.map(g => g.name).join(',')}\n`;
+    });
+
+    t += separator + "\n";
+    t += `TOTAL: ${order.totalPrice} FCFA\n`;
+    t += separator + "\n\n\n";
+    return t;
+  };
 const AdminPanel = ({
   styles,
   config,
