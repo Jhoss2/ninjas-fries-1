@@ -941,8 +941,23 @@ const styles = StyleSheet.create({
   logoFallback:{ width:80, height:80, borderRadius:40, backgroundColor:'#18181b', justifyContent:'center' },
   logoFallbackText:{ textAlign:'center', color:'#777', fontWeight:'900', fontStyle:'italic' },
 
-  price:{ textAlign:'center', fontSize:36, fontWeight:'900', color:'#f97316' },
-  priceUnit:{ fontSize:12 },
+  price: { 
+    textAlign: 'center', 
+    fontSize: 52,           // Augmenté de 36 à 52 pour une meilleure visibilité
+    fontWeight: '900', 
+    color: '#f97316',
+    // Petit effet de lueur pour faire ressortir le chiffre
+    textShadowColor: 'rgba(249, 115, 22, 0.3)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 10,
+    marginVertical: 10 
+  },
+  priceUnit: { 
+    fontSize: 18,           // Augmenté de 12 à 18 pour être lisible
+    color: '#f97316',
+    fontWeight: '700',
+    marginLeft: 5
+  },
 
   emptyText:{ textAlign:'center', color:'#444', fontWeight:'900' },
 
