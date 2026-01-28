@@ -861,33 +861,59 @@ return (
         )}
       </View>
 
-      <Modal visible={view === 'checkout'} transparent>
-        <View style={styles.modal}>
-          <Pressable
-            style={styles.closeModal}
-            onPress={() => setView('menu')}
-          >
-            <IconX size={18} />
-          </Pressable>
+      <Modal visible={view === 'checkout'} animationType="slide" transparent>
+        <View style={styles.checkoutOverlay}>
+          <View style={styles.checkoutSheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>MON PANIER</Text>
+              <Pressable onPress={() => setView('menu')} style={styles.closeSheet}>
+                <IconX size={24} />
+              </Pressable>
+            </View>
 
-          <ScrollView style={styles.cartList}>
-            {cart.map(item => (
-              <View key={item.cartId} style={styles.cartItem}>
-                <Text style={styles.cartItemName}>
-                  {item.quantity}x {item.name}
-                </Text>
-                <Text style={styles.cartItemPrice}>
-                  {item.totalPrice} F
+            <ScrollView style={styles.checkoutList}>
+              {cart.map((item) => (
+                <View key={item.cartId} style={styles.checkoutCard}>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardQty}>{item.quantity}x</Text>
+                    <View>
+                      <Text style={styles.cardName}>{item.name}</Text>
+                      <Text style={styles.cardExtras}>
+                        {[
+                          ...item.extras.sauces.map(s => s.name),
+                          ...item.extras.garnitures.map(g => g.name)
+                        ].join(' • ')}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardPrice}>{item.totalPrice} F</Text>
+                  <Pressable 
+                    onPress={() => setCart(cart.filter(i => i.cartId !== item.cartId))}
+                    style={styles.removeItem}
+                  >
+                    <IconX size={14} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.sheetFooter}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>TOTAL À PAYER</Text>
+                <Text style={styles.totalValue}>
+                  {cart.reduce((s, i) => s + i.totalPrice, 0)} FCFA
                 </Text>
               </View>
-            ))}
-          </ScrollView>
-
-          <Pressable style={styles.validateBtn} onPress={validateOrder}>
-            <Text style={styles.validateText}>
-              VALIDER LA COMMANDE
-            </Text>
-          </Pressable>
+              
+              <Pressable 
+                style={[styles.confirmOrderBtn, cart.length === 0 && { opacity: 0.5 }]} 
+                onPress={validateOrder}
+                disabled={cart.length === 0}
+              >
+                <Text style={styles.confirmOrderText}>VALIDER ET IMPRIMER</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -1054,6 +1080,48 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '900',
   },
+  checkoutOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.85)', 
+    justifyContent: 'flex-end' 
+  },
+  checkoutSheet: { 
+    backgroundColor: '#18181b', 
+    borderTopLeftRadius: 30, 
+    borderTopRightRadius: 30, 
+    height: '85%', 
+    padding: 25 
+  },
+  sheetHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  sheetTitle: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  closeSheet: { backgroundColor: '#27272a', padding: 8, borderRadius: 20 },
+  checkoutList: { flex: 1 },
+  checkoutCard: { 
+    backgroundColor: '#27272a', 
+    borderRadius: 20, 
+    padding: 15, 
+    marginBottom: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between' 
+  },
+  cardInfo: { flexDirection: 'row', alignItems: 'center', gap: 15, flex: 1 },
+  cardQty: { color: '#f97316', fontWeight: '900', fontSize: 18 },
+  cardName: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  cardExtras: { color: '#777', fontSize: 12, marginTop: 4 },
+  cardPrice: { color: '#fff', fontWeight: '900', fontSize: 16, marginRight: 10 },
+  removeItem: { padding: 5 },
+  sheetFooter: { borderTopWidth: 1, borderColor: '#27272a', paddingTop: 20 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  totalLabel: { color: '#777', fontWeight: '900' },
+  totalValue: { color: '#f97316', fontSize: 24, fontWeight: '900' },
+  confirmOrderBtn: { backgroundColor: '#f97316', padding: 20, borderRadius: 20, alignItems: 'center' },
+  confirmOrderText: { color: '#000', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
   qtyBadge:{ width:32, height:32, borderRadius:16, backgroundColor:'#18181b', justifyContent:'center' },
   qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900' },
   orderBtn:{ backgroundColor:'#f97316', padding:16, borderRadius:30 },
