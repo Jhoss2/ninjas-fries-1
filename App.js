@@ -432,7 +432,7 @@ const AdminPanel = ({
       <ScrollView contentContainerStyle={styles.adminContainer}>
 
         <View style={styles.adminHeader}>
-          <Text style={styles.adminTitle}>RÉGLAGES</Text>
+          <Text style={styles.adminTitle}>PANNEAU DE CONFIGURATION</Text>
           <Pressable
             onPress={() => { setView('menu'); setActiveForm(null); }}
             style={styles.iconBtn}
@@ -448,7 +448,7 @@ const AdminPanel = ({
               style={styles.adminBtn}
               onPress={() => setActiveForm('plat')}
             >
-              <Text style={styles.adminBtnText}>AJOUTER PLAT</Text>
+              <Text style={styles.adminBtnText}>AJOUTER UN PLAT</Text>
               <IconChevronRight size={14} />
             </Pressable>
 
@@ -456,7 +456,7 @@ const AdminPanel = ({
               style={styles.adminBtn}
               onPress={() => setActiveForm('sauce')}
             >
-              <Text style={styles.adminBtnText}>AJOUTER SAUCE</Text>
+              <Text style={styles.adminBtnText}>AJOUTER UNE SAUCE</Text>
               <IconChevronRight size={14} />
             </Pressable>
 
@@ -464,7 +464,7 @@ const AdminPanel = ({
               style={styles.adminBtn}
               onPress={() => setActiveForm('garniture')}
             >
-              <Text style={styles.adminBtnText}>AJOUTER GARNITURE</Text>
+              <Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text>
               <IconChevronRight size={14} />
             </Pressable>
 
@@ -707,7 +707,7 @@ return (
           </Text>
         ) : (
           <Text style={styles.emptyText}>
-            PRÊT À CRÉER VOTRE MENU NINJA ?
+            CONFIGUREZ VOTRE INTERFACE 
           </Text>
         )}
 
