@@ -407,27 +407,34 @@ const AdminPanel = ({
   const handleAddItem = () => {
     if (!formItem.name) return;
 
-    const newItem = {
-      ...formItem,
-      id: Date.now(),
-      price: parseInt(formItem.price) || 0
-    };
+    if (editingId) {
+      // --- LOGIQUE DE MODIFICATION (ÉDITION) ---
+      const updateList = (list) => list.map(item => 
+        item.id === editingId ? { ...formItem, id: editingId, price: parseInt(formItem.price) || 0 } : item
+      );
 
-    if (formItem.type === 'plat') {
-      setMenuItems([...menuItems, newItem]);
-    } else if (formItem.type === 'sauce') {
-      setSauces([
-        ...sauces,
-        { id: newItem.id, name: newItem.name, image: newItem.image }
-      ]);
-    } else if (formItem.type === 'garniture') {
-      setGarnitures([...garnitures, newItem]);
+      if (activeForm === 'plat') setMenuItems(updateList(menuItems));
+      else if (activeForm === 'sauce') setSauces(updateList(sauces));
+      else if (activeForm === 'garniture') setGarnitures(updateList(garnitures));
+      
+      setEditingId(null); // On réinitialise après la modif
+    } else {
+      // --- LOGIQUE D'AJOUT CLASSIQUE ---
+      const newItem = { 
+        ...formItem, 
+        id: Date.now(), 
+        price: parseInt(formItem.price) || 0 
+      };
+
+      if (activeForm === 'plat') setMenuItems([...menuItems, newItem]);
+      else if (activeForm === 'sauce') setSauces([...sauces, newItem]);
+      else if (activeForm === 'garniture') setGarnitures([...garnitures, newItem]);
     }
 
+    // On ferme le formulaire et on vide les champs
     setActiveForm(null);
     setFormItem({ name: '', price: '', image: '', type: 'plat' });
   };
-
   return (
     <View style={styles.adminRoot}>
       <ScrollView contentContainerStyle={styles.adminContainer}>
