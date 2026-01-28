@@ -393,16 +393,18 @@ export default function App() {
     t += separator + "\n";
 
     order.items.forEach(it => {
+      // On garde totalPrice ici car c'est le prix par ligne d'article
       t += `${it.quantity}x ${it.name} - ${it.totalPrice} F\n`;
       if (it.extras.sauces.length > 0) t += ` S: ${it.extras.sauces.map(s => s.name).join(',')}\n`;
       if (it.extras.garnitures.length > 0) t += ` G: ${it.extras.garnitures.map(g => g.name).join(',')}\n`;
     });
 
     t += separator + "\n";
-    t += `TOTAL: ${order.totalPrice} FCFA\n`;
+    // ON UTILISE .total POUR CORRESPONDRE À TON OBJET orderData
+    t += `TOTAL: ${order.total} FCFA\n`; 
     t += separator + "\n\n\n";
     return t;
-  };
+};
 const AdminPanel = ({
   styles,
   config,
