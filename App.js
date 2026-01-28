@@ -1038,6 +1038,30 @@ const styles = StyleSheet.create({
   pickerBtn:{ flex:1, borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
   pickerBtnWide:{ flex:1.2, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
   pickerText:{ color:'#777', fontWeight:'900', fontSize:10 },
+  extrasDropdown: {
+    backgroundColor: '#18181b',
+    borderRadius: 15,
+    padding: 10,
+    marginVertical: 10,
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#27272a'
+  },
+  extraItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#27272a',
+    marginRight: 10,
+  },
+  extraItemActive: {
+    backgroundColor: '#f97316',
+  },
+  extraItemText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold'
+  },
   qtyBadge:{ width:32, height:32, borderRadius:16, backgroundColor:'#18181b', justifyContent:'center' },
   qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900' },
   orderBtn:{ backgroundColor:'#f97316', padding:16, borderRadius:30 },
