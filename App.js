@@ -214,6 +214,7 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const [orderHistory, setOrderHistory] = useState([]);
   const [activeForm, setActiveForm] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
   /* ===================== PERSISTENCE ===================== */
   
@@ -467,6 +468,21 @@ const AdminPanel = ({
               <Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text>
               <IconChevronRight size={14} />
             </Pressable>
+                {/* --- COPIE CECI : BOUTONS DE GESTION DES LISTES --- */}
+<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_plats')}>
+  <Text style={styles.adminBtnText}>LISTE DES PLATS</Text>
+  <IconChevronRight size={14} color="#f97316" />
+</Pressable>
+
+<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_sauces')}>
+  <Text style={styles.adminBtnText}>LISTE DES SAUCES</Text>
+  <IconChevronRight size={14} color="#f97316" />
+</Pressable>
+
+<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}>
+  <Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text>
+  <IconChevronRight size={14} color="#f97316" />
+</Pressable>
 
             <Pressable
               style={styles.adminBtn}
@@ -663,8 +679,54 @@ const AdminPanel = ({
                       </View>
                     ))
                   )}
-                </ScrollView>
-              )}
+                {/* --- DEUXIÈME MORCEAU : AFFICHAGE DES CARTES HORIZONTALES --- */}
+{(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
+  <ScrollView style={{ marginTop: 10 }}>
+    {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
+      <View key={item.id} style={styles.adminHorizontalCard}>
+        <View style={styles.cardLeftContent}>
+          <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
+          <View>
+            <Text style={styles.cardMainText}>{item.name}</Text>
+            {/* Prix caché si c'est la liste des sauces */}
+            {activeForm !== 'list_sauces' && (
+              <Text style={styles.cardSubText}>{item.price} FCFA</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.cardActions}>
+          <Pressable 
+            style={styles.actionEdit} 
+            onPress={() => {
+              setEditingId(item.id);
+              setFormItem({ 
+                name: item.name, 
+                price: item.price ? item.price.toString() : '0', 
+                image: item.image, 
+                type: activeForm.replace('list_', '').replace(/s$/, '') 
+              });
+              setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
+            }}
+          >
+            <Text style={styles.actionBtnText}>MODIFIER</Text>
+          </Pressable>
+          <Pressable onPress={() => {
+            Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
+              { text: "ANNULER", style: "cancel" },
+              { text: "OUI", style: "destructive", onPress: () => {
+                if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
+                if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
+                if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
+              }}
+            ]);
+          }}>
+            <IconX size={20} color="#ef4444" />
+          </Pressable>
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+)}
 
             </View>
           </View>
@@ -1173,5 +1235,57 @@ const styles = StyleSheet.create({
   historyItem:{ marginBottom:4 },
   historyItemText:{ color:'#fff', fontSize:10 },
   historyExtras:{ color:'#777', fontSize:9 },
+  /* --- STYLES DES CARTES DE GESTION --- */
+  adminHorizontalCard: {
+    flexDirection: 'row',
+    backgroundColor: '#18181b',
+    borderRadius: 15,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginBottom: 8,
+  },
+  cardLeftContent: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12 
+  },
+  cardSmallThumb: { 
+    width: 50, 
+    height: 50, 
+    borderRadius: 8, 
+    backgroundColor: '#000', 
+    resizeMode: 'contain' 
+  },
+  cardMainText: { 
+    color: '#fff', 
+    fontWeight: 'bold', 
+    fontSize: 14 
+  },
+  cardSubText: { 
+    color: '#f97316', 
+    fontSize: 12, 
+    fontWeight: '900' 
+  },
+  cardActions: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 15 
+  },
+  actionEdit: { 
+    backgroundColor: '#27272a', 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#3b82f6' 
+  },
+  actionBtnText: { 
+    color: '#3b82f6', 
+    fontSize: 10, 
+    fontWeight: '900' 
+  },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:20 }
 }); // ICI : on ferme StyleSheet.create
