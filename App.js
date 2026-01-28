@@ -809,6 +809,47 @@ return (
           </View>
         )}
 
+        {/* --- SÉLECTEUR DE SAUCES (Apparaît si on clique sur le bouton Sauces) --- */}
+        {showSaucePicker && (
+          <View style={styles.extrasDropdown}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {sauces.map((s) => (
+                <Pressable 
+                  key={s.id} 
+                  onPress={() => toggleExtra('sauces', s)}
+                  style={[
+                    styles.extraItem, 
+                    selectedExtras.sauces.find(x => x.id === s.id) && styles.extraItemActive
+                  ]}
+                >
+                  <Text style={styles.extraItemText}>{s.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* --- SÉLECTEUR DE GARNITURES (Apparaît si on clique sur le bouton Garnitures) --- */}
+        {showGarniturePicker && (
+          <View style={styles.extrasDropdown}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {garnitures.map((g) => (
+                <Pressable 
+                  key={g.id} 
+                  onPress={() => toggleExtra('garnitures', g)}
+                  style={[
+                    styles.extraItem, 
+                    selectedExtras.garnitures.find(x => x.id === g.id) && styles.extraItemActive
+                  ]}
+                >
+                  <Text style={styles.extraItemText}>{g.name} (+{g.price} F)</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Ton bouton commander actuel */}
         {currentItem && (
           <Pressable
             style={styles.orderBtn}
