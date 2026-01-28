@@ -710,66 +710,68 @@ const AdminPanel = ({
                           </View>
                         ))}
                       </View>
+                    // ... (fin de ton code orderHistory.map)
                     ))
                   )}
-                {/* --- DEUXIÈME MORCEAU : AFFICHAGE DES CARTES HORIZONTALES --- */}
-{(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
-  <ScrollView style={{ marginTop: 10 }}>
-    {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
-      <View key={item.id} style={styles.adminHorizontalCard}>
-        <View style={styles.cardLeftContent}>
-          <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
-          <View>
-            <Text style={styles.cardMainText}>{item.name}</Text>
-            {/* Prix caché si c'est la liste des sauces */}
-            {activeForm !== 'list_sauces' && (
-              <Text style={styles.cardSubText}>{item.price} FCFA</Text>
+
+                  {/* --- AFFICHAGE DES CARTES HORIZONTALES --- */}
+                  {(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
+                    <ScrollView style={{ marginTop: 10 }}>
+                      {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
+                        <View key={item.id} style={styles.adminHorizontalCard}>
+                          <View style={styles.cardLeftContent}>
+                            <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
+                            <View>
+                              <Text style={styles.cardMainText}>{item.name}</Text>
+                              {activeForm !== 'list_sauces' && (
+                                <Text style={styles.cardSubText}>{item.price} FCFA</Text>
+                              )}
+                            </View>
+                          </View>
+                          <View style={styles.cardActions}>
+                            <Pressable 
+                              style={styles.actionEdit} 
+                              onPress={() => {
+                                setEditingId(item.id);
+                                setFormItem({ 
+                                  name: item.name, 
+                                  price: item.price ? item.price.toString() : '0', 
+                                  image: item.image, 
+                                  type: activeForm.replace('list_', '').replace(/s$/, '') 
+                                });
+                                setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
+                              }}
+                            >
+                              <Text style={styles.actionBtnText}>MODIFIER</Text>
+                            </Pressable>
+                            <Pressable onPress={() => {
+                              Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
+                                { text: "ANNULER", style: "cancel" },
+                                { text: "OUI", style: "destructive", onPress: () => {
+                                  if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
+                                  if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
+                                  if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
+                                }}
+                              ]);
+                            }}>
+                              <IconX size={20} color="#ef4444" />
+                            </Pressable>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+
+                </View> {/* Fin de formCard */}
+              </View> {/* Fin de adminFormWrapper */}
             )}
-          </View>
+
+          </ScrollView>
         </View>
-        <View style={styles.cardActions}>
-          <Pressable 
-            style={styles.actionEdit} 
-            onPress={() => {
-              setEditingId(item.id);
-              setFormItem({ 
-                name: item.name, 
-                price: item.price ? item.price.toString() : '0', 
-                image: item.image, 
-                type: activeForm.replace('list_', '').replace(/s$/, '') 
-              });
-              setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
-            }}
-          >
-            <Text style={styles.actionBtnText}>MODIFIER</Text>
-          </Pressable>
-          <Pressable onPress={() => {
-            Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
-              { text: "ANNULER", style: "cancel" },
-              { text: "OUI", style: "destructive", onPress: () => {
-                if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
-                if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
-                if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
-              }}
-            ]);
-          }}>
-            <IconX size={20} color="#ef4444" />
-          </Pressable>
-        </View>
-      </View>
-    ))}
-  </ScrollView>
-)}
+      );
+    }; // <--- C'EST CETTE FERMETURE QUI MANQUAIT
 
-            </View>
-          </View>
-        )}
-
-      </ScrollView>
-    </View>
-  );
-};
-
+// ENSUITE COMMENCE LE RETURN PRINCIPAL DU COMPOSANT PARENT
 return (
   <View style={styles.root}>
 
