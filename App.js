@@ -398,7 +398,7 @@ export default function App() {
     handleExportCSV,
     handleImageUpload
   }) => {
-
+    const [editingId, setEditingId] = useState(null);
     const [formItem, setFormItem] = useState({
       name: '',
       price: '',
@@ -407,33 +407,72 @@ export default function App() {
     });
 
     const handleAddItem = () => {
-      if (!formItem.name) return;
+        if (!formItem.name) return;
 
-      if (editingId) {
-        const updateList = (list) => list.map(item => 
-          item.id === editingId ? { ...formItem, id: editingId, price: parseInt(formItem.price) || 0 } : item
-        );
+        try {
+            if (editingId) {
+                // CAS 1 : MODIFICATION
+                Database.updateProduct(
+                    editingId,
+                    formItem.name,
+                    parseInt(formItem.price) || 0,
+                    formItem.image
+                );
+                setEditingId(null);
+            } else {
+                // CAS 2 : AJOUT
+                Database.saveProduct(
+                    formItem.name,
+                    parseInt(formItem.price) || 0,
+                    formItem.image,
+                    activeForm // 'plat', 'sauce' ou 'garniture'
+                );
+            }
 
-        if (activeForm === 'plat') setMenuItems(updateList(menuItems));
-        else if (activeForm === 'sauce') setSauces(updateList(sauces));
-        else if (activeForm === 'garniture') setGarnitures(updateList(garnitures));
-        
-        setEditingId(null);
-      } else {
-        const newItem = { 
-          ...formItem, 
-          id: Date.now(), 
-          price: parseInt(formItem.price) || 0 
-        };
+            // MISE À JOUR DE L'INTERFACE
+            setMenuItems(Database.getProducts('plat'));
+            setSauces(Database.getProducts('sauce'));
+            setGarnitures(Database.getProducts('garniture'));
 
-        if (activeForm === 'plat') setMenuItems([...menuItems, newItem]);
-        else if (activeForm === 'sauce') setSauces([...sauces, newItem]);
-        else if (activeForm === 'garniture') setGarnitures([...garnitures, newItem]);
+            // RESET DU FORMULAIRE
+            setActiveForm(null);
+            setFormItem({ name: '', price: '', image: '', type: 'plat' });
+            
+            Alert.alert("Succès", "Base de données mise à jour");
+
+        } catch (error) {
+            console.error("Erreur SQL:", error);
+            Alert.alert("Erreur", "Impossible d'enregistrer.");
+        }
+    }; // <--- La fonction handleAddItem se termine ici
+    const handleDelete = (item) => {
+  Alert.alert(
+    "🗑️ SUPPRIMER",
+    `Voulez-vous vraiment supprimer "${item.name}" ?`,
+    [
+      { text: "ANNULER", style: "cancel" },
+      { 
+        text: "OUI", 
+        style: "destructive", 
+        onPress: () => {
+          try {
+            // 1. Suppression physique dans SQLite
+            Database.deleteProduct(item.id);
+
+            // 2. Rafraîchissement des listes à l'écran
+            setMenuItems(Database.getProducts('plat'));
+            setSauces(Database.getProducts('sauce'));
+            setGarnitures(Database.getProducts('garniture'));
+            
+          } catch (error) {
+            console.error("Erreur suppression SQL:", error);
+            Alert.alert("Erreur", "Impossible de supprimer l'article.");
+          }
+        } 
       }
-
-      setActiveForm(null);
-      setFormItem({ name: '', price: '', image: '', type: 'plat' });
-    };
+    ]
+  );
+};
 
     return (
       <View style={styles.adminRoot}>
@@ -718,18 +757,9 @@ export default function App() {
                           >
                             <Text style={styles.actionBtnText}>MODIFIER</Text>
                           </Pressable>
-                          <Pressable onPress={() => {
-                            Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
-                              { text: "ANNULER", style: "cancel" },
-                              { text: "OUI", style: "destructive", onPress: () => {
-                                if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
-                                if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
-                                if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
-                              }}
-                            ]);
-                          }}>
-                            <IconX size={20} color="#ef4444" />
-                          </Pressable>
+                          <Pressable onPress={() => handleDelete(item)}>
+  <IconX size={20} color="#ef4444" />
+</Pressable>
                         </View>
                       </View>
                     ))}
