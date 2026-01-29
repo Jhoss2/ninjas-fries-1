@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,7 @@ import {
   Modal,
   StyleSheet,
   Platform,
-  Dimensions,
   useWindowDimensions,
-  SafeAreaView,
   Alert
 } from 'react-native';
 
@@ -58,10 +56,10 @@ const IconMinus = () => (
   </Svg>
 );
 
-const IconX = ({ size = 20 }) => (
+const IconX = ({ size = 20, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <Line x1="18" y1="6" x2="6" y2="18" stroke="white" strokeWidth="2.5" />
-    <Line x1="6" y1="6" x2="18" y2="18" stroke="white" strokeWidth="2.5" />
+    <Line x1="18" y1="6" x2="6" y2="18" stroke={color} strokeWidth="2.5" />
+    <Line x1="6" y1="6" x2="18" y2="18" stroke={color} strokeWidth="2.5" />
   </Svg>
 );
 
@@ -78,15 +76,15 @@ const IconCamera = () => (
   </Svg>
 );
 
-const IconChevronLeft = ({ size = 24 }) => (
+const IconChevronLeft = ({ size = 24, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <Polyline points="15 18 9 12 15 6" stroke="white" strokeWidth="2.5" fill="none"/>
+    <Polyline points="15 18 9 12 15 6" stroke={color} strokeWidth="2.5" fill="none"/>
   </Svg>
 );
 
-const IconChevronRight = ({ size = 24 }) => (
+const IconChevronRight = ({ size = 24, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <Polyline points="9 18 15 12 9 6" stroke="white" strokeWidth="2.5" fill="none"/>
+    <Polyline points="9 18 15 12 9 6" stroke={color} strokeWidth="2.5" fill="none"/>
   </Svg>
 );
 
@@ -196,6 +194,7 @@ export const exportOrdersToCSV = async (orderHistory) => {
 export default function App() {
   /* ===================== ADAPTATION ÉCRAN ===================== */
   const { width } = useWindowDimensions();
+  // eslint-disable-next-line no-unused-vars
   const isTablet = width > 768; // Détecte si l'appareil est une tablette
 
   /* ===================== ÉTATS ===================== */
@@ -310,6 +309,7 @@ export default function App() {
       quality: 0.7,
       base64: true
     });
+
     if (!result.canceled) {
       const base64 = result.assets[0].base64;
       callback(`data:image/jpeg;base64,${base64}`);
@@ -367,13 +367,11 @@ export default function App() {
   };
 
   setOrderHistory([orderData, ...orderHistory]);
-  
-
   setCart([]);
 
   try {
     // On envoie le texte généré à ton imprimante
-   await printOrderViaBLE(orderData); 
+    await printOrderViaBLE(orderData); 
     console.log('Commande imprimée avec succès');
   } catch (err) {
     console.warn('Impossible d\'imprimer la commande', err);
@@ -387,685 +385,694 @@ export default function App() {
   }, 4000);
 };
 
-
   /* ===================== EXPORT CSV ===================== */
   const handleExportCSV = async () => {
     await exportOrdersToCSV(orderHistory);
   };
-const AdminPanel = ({
-  styles,
-  config,
-  setConfig,
-  menuItems,
-  setMenuItems,
-  sauces,
-  setSauces,
-  garnitures,
-  setGarnitures,
-  activeForm,
-  setActiveForm,
-  setView,
-  orderHistory,
-  handleExportCSV,
-  handleImageUpload
-}) => {
 
-  const [formItem, setFormItem] = useState({
-    name: '',
-    price: '',
-    image: '',
-    type: 'plat'
-  });
-
-  const handleAddItem = () => {
-    if (!formItem.name) return;
-
-    if (editingId) {
-      // --- LOGIQUE DE MODIFICATION (ÉDITION) ---
-      const updateList = (list) => list.map(item => 
-        item.id === editingId ? { ...formItem, id: editingId, price: parseInt(formItem.price) || 0 } : item
-      );
-
-      if (activeForm === 'plat') setMenuItems(updateList(menuItems));
-      else if (activeForm === 'sauce') setSauces(updateList(sauces));
-      else if (activeForm === 'garniture') setGarnitures(updateList(garnitures));
-      
-      setEditingId(null); // On réinitialise après la modif
-    } else {
-      // --- LOGIQUE D'AJOUT CLASSIQUE ---
-      const newItem = { 
-        ...formItem, 
-        id: Date.now(), 
-        price: parseInt(formItem.price) || 0 
-      };
-
-      if (activeForm === 'plat') setMenuItems([...menuItems, newItem]);
-      else if (activeForm === 'sauce') setSauces([...sauces, newItem]);
-      else if (activeForm === 'garniture') setGarnitures([...garnitures, newItem]);
-    }
-
-    // On ferme le formulaire et on vide les champs
-    setActiveForm(null);
-    setFormItem({ name: '', price: '', image: '', type: 'plat' });
+  const addToCart = () => {
+    if (!currentItem) return;
+    const newItem = {
+      cartId: Date.now(),
+      ...currentItem,
+      quantity,
+      extras: { ...selectedExtras },
+      totalPrice
+    };
+    setCart([...cart, newItem]);
+    setView('checkout');
   };
-  return (
-    <View style={styles.adminRoot}>
-      <ScrollView contentContainerStyle={styles.adminContainer}>
 
-        <View style={styles.adminHeader}>
-          <Text style={styles.adminTitle}>PANNEAU DE CONFIGURATION</Text>
-          <Pressable
-            onPress={() => { setView('menu'); setActiveForm(null); }}
-            style={styles.iconBtn}
-          >
-            <IconX size={16} />
-          </Pressable>
-        </View>
+  /* ===================== ADMIN PANEL ===================== */
+  const AdminPanel = ({
+    styles,
+    config,
+    setConfig,
+    menuItems,
+    setMenuItems,
+    sauces,
+    setSauces,
+    garnitures,
+    setGarnitures,
+    activeForm,
+    setActiveForm,
+    setView,
+    orderHistory,
+    handleExportCSV,
+    handleImageUpload
+  }) => {
 
-        {!activeForm && (
-          <View style={styles.adminMenu}>
+    const [formItem, setFormItem] = useState({
+      name: '',
+      price: '',
+      image: '',
+      type: 'plat'
+    });
 
+    const handleAddItem = () => {
+      if (!formItem.name) return;
+
+      if (editingId) {
+        const updateList = (list) => list.map(item => 
+          item.id === editingId ? { ...formItem, id: editingId, price: parseInt(formItem.price) || 0 } : item
+        );
+
+        if (activeForm === 'plat') setMenuItems(updateList(menuItems));
+        else if (activeForm === 'sauce') setSauces(updateList(sauces));
+        else if (activeForm === 'garniture') setGarnitures(updateList(garnitures));
+        
+        setEditingId(null);
+      } else {
+        const newItem = { 
+          ...formItem, 
+          id: Date.now(), 
+          price: parseInt(formItem.price) || 0 
+        };
+
+        if (activeForm === 'plat') setMenuItems([...menuItems, newItem]);
+        else if (activeForm === 'sauce') setSauces([...sauces, newItem]);
+        else if (activeForm === 'garniture') setGarnitures([...garnitures, newItem]);
+      }
+
+      setActiveForm(null);
+      setFormItem({ name: '', price: '', image: '', type: 'plat' });
+    };
+
+    return (
+      <View style={styles.adminRoot}>
+        <ScrollView contentContainerStyle={styles.adminContainer}>
+
+          <View style={styles.adminHeader}>
+            <Text style={styles.adminTitle}>PANNEAU DE CONFIGURATION</Text>
             <Pressable
-              style={styles.adminBtn}
-              onPress={() => setActiveForm('plat')}
+              onPress={() => { setView('menu'); setActiveForm(null); }}
+              style={styles.iconBtn}
             >
-              <Text style={styles.adminBtnText}>AJOUTER UN PLAT</Text>
-              <IconChevronRight size={14} />
+              <IconX size={16} />
             </Pressable>
-
-            <Pressable
-              style={styles.adminBtn}
-              onPress={() => setActiveForm('sauce')}
-            >
-              <Text style={styles.adminBtnText}>AJOUTER UNE SAUCE</Text>
-              <IconChevronRight size={14} />
-            </Pressable>
-
-            <Pressable
-              style={styles.adminBtn}
-              onPress={() => setActiveForm('garniture')}
-            >
-              <Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text>
-              <IconChevronRight size={14} />
-            </Pressable>
-                {/* --- COPIE CECI : BOUTONS DE GESTION DES LISTES --- */}
-<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_plats')}>
-  <Text style={styles.adminBtnText}>LISTE DES PLATS</Text>
-  <IconChevronRight size={14} color="#f97316" />
-</Pressable>
-
-<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_sauces')}>
-  <Text style={styles.adminBtnText}>LISTE DES SAUCES</Text>
-  <IconChevronRight size={14} color="#f97316" />
-</Pressable>
-
-<Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}>
-  <Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text>
-  <IconChevronRight size={14} color="#f97316" />
-</Pressable>
-
-            <Pressable
-              style={styles.adminBtn}
-              onPress={() => setActiveForm('logo')}
-            >
-              <Text style={styles.adminBtnText}>LOGOS & QR</Text>
-              <IconChevronRight size={14} />
-            </Pressable>
-
-            <Pressable
-              style={styles.adminBtn}
-              onPress={() => setActiveForm('history')}
-            >
-              <Text style={styles.adminBtnText}>HISTORIQUE DES VENTES</Text>
-              <IconChevronRight size={14} />
-            </Pressable>
-
-            <Pressable
-              style={styles.exportBtn}
-              onPress={handleExportCSV}
-            >
-              <Text style={styles.exportText}>
-                EXPORTER L’HISTORIQUE (CSV)
-              </Text>
-            </Pressable>
-
           </View>
-        )}
 
-        {activeForm && (
-          <View style={styles.adminFormWrapper}>
+          {!activeForm && (
+            <View style={styles.adminMenu}>
 
-            <Pressable
-              style={styles.backBtn}
-              onPress={() => setActiveForm(null)}
-            >
-              <IconChevronLeft size={14} />
-              <Text style={styles.backText}>RETOUR</Text>
-            </Pressable>
+              <Pressable
+                style={styles.adminBtn}
+                onPress={() => setActiveForm('plat')}
+              >
+                <Text style={styles.adminBtnText}>AJOUTER UN PLAT</Text>
+                <IconChevronRight size={14} />
+              </Pressable>
 
-            <View style={styles.formCard}>
+              <Pressable
+                style={styles.adminBtn}
+                onPress={() => setActiveForm('sauce')}
+              >
+                <Text style={styles.adminBtnText}>AJOUTER UNE SAUCE</Text>
+                <IconChevronRight size={14} />
+              </Pressable>
 
-              {(activeForm === 'plat' ||
-                activeForm === 'sauce' ||
-                activeForm === 'garniture') && (
-                <>
-                  <Text style={styles.formTitle}>
-                    NOUVEAU {activeForm.toUpperCase()}
-                  </Text>
+              <Pressable
+                style={styles.adminBtn}
+                onPress={() => setActiveForm('garniture')}
+              >
+                <Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text>
+                <IconChevronRight size={14} />
+              </Pressable>
 
-                  <Pressable
-                    style={styles.imagePicker}
-                    onPress={() =>
-                      handleImageUpload((res) =>
-                        setFormItem({
-                          ...formItem,
-                          image: res,
-                          type: activeForm
-                        })
-                      )
-                    }
-                  >
-                    {formItem.image ? (
-                      <Image
-                        source={{ uri: formItem.image }}
-                        style={styles.imagePreview}
-                      />
-                    ) : (
-                      <IconCamera />
-                    )}
-                  </Pressable>
+              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_plats')}>
+                <Text style={styles.adminBtnText}>LISTE DES PLATS</Text>
+                <IconChevronRight size={14} color="#f97316" />
+              </Pressable>
 
-                  <TextInput
-                    placeholder="Nom"
-                    placeholderTextColor="#777"
-                    style={styles.input}
-                    value={formItem.name}
-                    onChangeText={(t) =>
-                      setFormItem({ ...formItem, name: t })
-                    }
-                  />
+              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_sauces')}>
+                <Text style={styles.adminBtnText}>LISTE DES SAUCES</Text>
+                <IconChevronRight size={14} color="#f97316" />
+              </Pressable>
 
-                  {activeForm !== 'sauce' && (
+              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}>
+                <Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text>
+                <IconChevronRight size={14} color="#f97316" />
+              </Pressable>
+
+              <Pressable
+                style={styles.adminBtn}
+                onPress={() => setActiveForm('logo')}
+              >
+                <Text style={styles.adminBtnText}>LOGOS & QR</Text>
+                <IconChevronRight size={14} />
+              </Pressable>
+
+              <Pressable
+                style={styles.adminBtn}
+                onPress={() => setActiveForm('history')}
+              >
+                <Text style={styles.adminBtnText}>HISTORIQUE DES VENTES</Text>
+                <IconChevronRight size={14} />
+              </Pressable>
+
+              <Pressable
+                style={styles.exportBtn}
+                onPress={handleExportCSV}
+              >
+                <Text style={styles.exportText}>
+                  EXPORTER L’HISTORIQUE (CSV)
+                </Text>
+              </Pressable>
+
+            </View>
+          )}
+
+          {activeForm && (
+            <View style={styles.adminFormWrapper}>
+
+              <Pressable
+                style={styles.backBtn}
+                onPress={() => setActiveForm(null)}
+              >
+                <IconChevronLeft size={14} color="#777" />
+                <Text style={styles.backText}>RETOUR</Text>
+              </Pressable>
+
+              <View style={styles.formCard}>
+
+                {(activeForm === 'plat' ||
+                  activeForm === 'sauce' ||
+                  activeForm === 'garniture') && (
+                  <>
+                    <Text style={styles.formTitle}>
+                      NOUVEAU {activeForm.toUpperCase()}
+                    </Text>
+
+                    <Pressable
+                      style={styles.imagePicker}
+                      onPress={() =>
+                        handleImageUpload((res) =>
+                          setFormItem({
+                            ...formItem,
+                            image: res,
+                            type: activeForm
+                          })
+                        )
+                      }
+                    >
+                      {formItem.image ? (
+                        <Image
+                          source={{ uri: formItem.image }}
+                          style={styles.imagePreview}
+                        />
+                      ) : (
+                        <IconCamera />
+                      )}
+                    </Pressable>
+
                     <TextInput
-                      placeholder="Prix (FCFA)"
+                      placeholder="Nom"
                       placeholderTextColor="#777"
-                      keyboardType="numeric"
                       style={styles.input}
-                      value={formItem.price}
+                      value={formItem.name}
                       onChangeText={(t) =>
-                        setFormItem({ ...formItem, price: t })
+                        setFormItem({ ...formItem, name: t })
                       }
                     />
-                  )}
 
-                  <Pressable
-                    style={styles.saveBtn}
-                    onPress={handleAddItem}
-                  >
-                    <Text style={styles.saveText}>ENREGISTRER</Text>
-                  </Pressable>
-                </>
-              )}
-
-              {activeForm === 'logo' && (
-                <View style={{ gap: 20 }}>
-
-                  <Text style={styles.formTitle}>LOGO PRINCIPAL</Text>
-                  <Pressable
-                    style={styles.logoPicker}
-                    onPress={() =>
-                      handleImageUpload((res) =>
-                        setConfig({ ...config, logoUrl: res })
-                      )
-                    }
-                  >
-                    {config.logoUrl ? (
-                      <Image
-                        source={{ uri: config.logoUrl }}
-                        style={styles.logoPreview}
+                    {activeForm !== 'sauce' && (
+                      <TextInput
+                        placeholder="Prix (FCFA)"
+                        placeholderTextColor="#777"
+                        keyboardType="numeric"
+                        style={styles.input}
+                        value={formItem.price}
+                        onChangeText={(t) =>
+                          setFormItem({ ...formItem, price: t })
+                        }
                       />
-                    ) : (
-                      <IconCamera />
                     )}
-                  </Pressable>
 
-                  <Text style={styles.formTitle}>IMAGE QR CODE</Text>
-                  <Pressable
-                    style={styles.qrPicker}
-                    onPress={() =>
-                      handleImageUpload((res) =>
-                        setConfig({ ...config, qrCodeUrl: res })
-                      )
-                    }
-                  >
-                    {config.qrCodeUrl ? (
-                      <Image
-                        source={{ uri: config.qrCodeUrl }}
-                        style={styles.qrPreview}
-                      />
+                    <Pressable
+                      style={styles.saveBtn}
+                      onPress={handleAddItem}
+                    >
+                      <Text style={styles.saveText}>ENREGISTRER</Text>
+                    </Pressable>
+                  </>
+                )}
+
+                {activeForm === 'logo' && (
+                  <View style={{ gap: 20 }}>
+
+                    <Text style={styles.formTitle}>LOGO PRINCIPAL</Text>
+                    <Pressable
+                      style={styles.logoPicker}
+                      onPress={() =>
+                        handleImageUpload((res) =>
+                          setConfig({ ...config, logoUrl: res })
+                        )
+                      }
+                    >
+                      {config.logoUrl ? (
+                        <Image
+                          source={{ uri: config.logoUrl }}
+                          style={styles.logoPreview}
+                        />
+                      ) : (
+                        <IconCamera />
+                      )}
+                    </Pressable>
+
+                    <Text style={styles.formTitle}>IMAGE QR CODE</Text>
+                    <Pressable
+                      style={styles.qrPicker}
+                      onPress={() =>
+                        handleImageUpload((res) =>
+                          setConfig({ ...config, qrCodeUrl: res })
+                        )
+                      }
+                    >
+                      {config.qrCodeUrl ? (
+                        <Image
+                          source={{ uri: config.qrCodeUrl }}
+                          style={styles.qrPreview}
+                        />
+                      ) : (
+                        <IconCamera />
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+
+                {activeForm === 'history' && (
+                  <ScrollView style={{ maxHeight: 400 }}>
+                    {orderHistory.length === 0 ? (
+                      <Text style={styles.emptyHistory}>
+                        AUCUNE COMMANDE ENREGISTRÉE
+                      </Text>
                     ) : (
-                      <IconCamera />
-                    )}
-                  </Pressable>
-                </View>
-              )}
-
-              {activeForm === 'history' && (
-                <ScrollView style={{ maxHeight: 400 }}>
-                  {orderHistory.length === 0 ? (
-                    <Text style={styles.emptyHistory}>
-                      AUCUNE COMMANDE ENREGISTRÉE
-                    </Text>
-                  ) : (
-                    orderHistory.map(order => (
-                      <View
-                        key={order.id}
-                        style={[
-                          styles.historyCard,
-                          {
-                            borderLeftColor:
-                              DAILY_COLORS[
-                                parseInt(order.date.split('/')[0]) % 30
-                              ] || '#f97316'
-                          }
-                        ]}
-                      >
-                        <View style={styles.historyHeader}>
-                          <Text style={styles.historyDate}>
-                            {order.date} - {order.time}
-                          </Text>
-                          <Text style={styles.historyTotal}>
-                            {order.total} F
-                          </Text>
-                        </View>
-
-                        {order.items.map((it, idx) => (
-                          <View key={idx} style={styles.historyItem}>
-                            <Text style={styles.historyItemText}>
-                              {it.quantity}x {it.name}
+                      orderHistory.map(order => (
+                        <View
+                          key={order.id}
+                          style={[
+                            styles.historyCard,
+                            {
+                              borderLeftColor:
+                                DAILY_COLORS[
+                                  parseInt(order.date.split('/')[0]) % 30
+                                ] || '#f97316'
+                            }
+                          ]}
+                        >
+                          <View style={styles.historyHeader}>
+                            <Text style={styles.historyDate}>
+                              {order.date} - {order.time}
                             </Text>
-                            <Text style={styles.historyExtras}>
-                              {it.extras.sauces.length > 0 &&
-                                `Sauces: ${it.extras.sauces
-                                  .map(s => s.name)
-                                  .join(', ')}`}
-                              {it.extras.garnitures.length > 0 &&
-                                ` | Garnitures: ${it.extras.garnitures
-                                  .map(g => g.name)
-                                  .join(', ')}`}
+                            <Text style={styles.historyTotal}>
+                              {order.total} F
                             </Text>
                           </View>
-                        ))}
-                      </View>
-                    // ... (fin de ton code orderHistory.map)
-                    ))
-                  )}
 
-                  {/* --- AFFICHAGE DES CARTES HORIZONTALES --- */}
-                  {(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
-                    <ScrollView style={{ marginTop: 10 }}>
-                      {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
-                        <View key={item.id} style={styles.adminHorizontalCard}>
-                          <View style={styles.cardLeftContent}>
-                            <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
-                            <View>
-                              <Text style={styles.cardMainText}>{item.name}</Text>
-                              {activeForm !== 'list_sauces' && (
-                                <Text style={styles.cardSubText}>{item.price} FCFA</Text>
-                              )}
+                          {order.items.map((it, idx) => (
+                            <View key={idx} style={styles.historyItem}>
+                              <Text style={styles.historyItemText}>
+                                {it.quantity}x {it.name}
+                              </Text>
+                              <Text style={styles.historyExtras}>
+                                {it.extras.sauces.length > 0 &&
+                                  `Sauces: ${it.extras.sauces
+                                    .map(s => s.name)
+                                    .join(', ')}`}
+                                {it.extras.garnitures.length > 0 &&
+                                  ` | Garnitures: ${it.extras.garnitures
+                                    .map(g => g.name)
+                                    .join(', ')}`}
+                              </Text>
                             </View>
-                          </View>
-                          <View style={styles.cardActions}>
-                            <Pressable 
-                              style={styles.actionEdit} 
-                              onPress={() => {
-                                setEditingId(item.id);
-                                setFormItem({ 
-                                  name: item.name, 
-                                  price: item.price ? item.price.toString() : '0', 
-                                  image: item.image, 
-                                  type: activeForm.replace('list_', '').replace(/s$/, '') 
-                                });
-                                setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
-                              }}
-                            >
-                              <Text style={styles.actionBtnText}>MODIFIER</Text>
-                            </Pressable>
-                            <Pressable onPress={() => {
-                              Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
-                                { text: "ANNULER", style: "cancel" },
-                                { text: "OUI", style: "destructive", onPress: () => {
-                                  if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
-                                  if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
-                                  if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
-                                }}
-                              ]);
-                            }}>
-                              <IconX size={20} color="#ef4444" />
-                            </Pressable>
+                          ))}
+                        </View>
+                      ))
+                    )}
+                  </ScrollView>
+                )}
+
+                {(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
+                  <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
+                    {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
+                      <View key={item.id} style={styles.adminHorizontalCard}>
+                        <View style={styles.cardLeftContent}>
+                          <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
+                          <View>
+                            <Text style={styles.cardMainText}>{item.name}</Text>
+                            {activeForm !== 'list_sauces' && (
+                              <Text style={styles.cardSubText}>{item.price} FCFA</Text>
+                            )}
                           </View>
                         </View>
-                      ))}
-                    </ScrollView>
-                  )}
+                        <View style={styles.cardActions}>
+                          <Pressable 
+                            style={styles.actionEdit} 
+                            onPress={() => {
+                              setEditingId(item.id);
+                              setFormItem({ 
+                                name: item.name, 
+                                price: item.price ? item.price.toString() : '0', 
+                                image: item.image, 
+                                type: activeForm.replace('list_', '').replace(/s$/, '') 
+                              });
+                              setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
+                            }}
+                          >
+                            <Text style={styles.actionBtnText}>MODIFIER</Text>
+                          </Pressable>
+                          <Pressable onPress={() => {
+                            Alert.alert("🗑️ SUPPRIMER", `Supprimer "${item.name}" ?`, [
+                              { text: "ANNULER", style: "cancel" },
+                              { text: "OUI", style: "destructive", onPress: () => {
+                                if(activeForm === 'list_plats') setMenuItems(menuItems.filter(i => i.id !== item.id));
+                                if(activeForm === 'list_sauces') setSauces(sauces.filter(i => i.id !== item.id));
+                                if(activeForm === 'list_garnitures') setGarnitures(garnitures.filter(i => i.id !== item.id));
+                              }}
+                            ]);
+                          }}>
+                            <IconX size={20} color="#ef4444" />
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
 
-                </View> {/* Fin de formCard */}
-              </View> {/* Fin de adminFormWrapper */}
-            )}
-
-          </ScrollView>
-        </View>
-      );
-    }; // <--- C'EST CETTE FERMETURE QUI MANQUAIT
-
-// ENSUITE COMMENCE LE RETURN PRINCIPAL DU COMPOSANT PARENT
-return (
-  <View style={styles.root}>
-
-    <View style={styles.tablet}>
-
-      <Pressable
-        style={styles.adminAccess}
-        onPress={() => setShowPassModal(true)}
-      >
-        <IconChevronRight size={20} />
-      </Pressable>
-
-      <View style={styles.content}>
-
-        <View style={styles.logoWrapper}>
-          {config.logoUrl ? (
-            <Image source={{ uri: config.logoUrl }} style={styles.logo} />
-          ) : (
-            <View style={styles.logoFallback}>
-              <Text style={styles.logoFallbackText}>
-                Ninja's Fries
-              </Text>
+              </View>
             </View>
+          )}
+
+        </ScrollView>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.tablet}>
+        <Pressable
+          style={styles.adminAccess}
+          onPress={() => setShowPassModal(true)}
+        >
+          <IconChevronRight size={20} />
+        </Pressable>
+
+        <View style={styles.content}>
+          <View style={styles.logoWrapper}>
+            {config.logoUrl ? (
+              <Image source={{ uri: config.logoUrl }} style={styles.logo} />
+            ) : (
+              <View style={styles.logoFallback}>
+                <Text style={styles.logoFallbackText}>
+                  Ninja's Fries
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {currentItem ? (
+            <Text style={styles.price}>
+              {totalPrice} <Text style={styles.priceUnit}>FCFA</Text>
+            </Text>
+          ) : (
+            <Text style={styles.emptyText}>
+              CONFIGUREZ VOTRE INTERFACE 
+            </Text>
+          )}
+
+          {menuItems.length > 0 && (
+            <View style={styles.carousel}>
+              <Pressable style={styles.navLeft} onPress={prevItem}>
+                <IconChevronLeft size={44} />
+              </Pressable>
+
+              <Pressable style={styles.navRight} onPress={nextItem}>
+                <IconChevronRight size={44} />
+              </Pressable>
+
+              {menuItems.map((item, idx) => {
+                let scale = 0;
+                let opacity = 0;
+
+                if (idx === activeIndex) {
+                  scale = 1.6;
+                  opacity = 1;
+                } else if (
+                  idx === (activeIndex - 1 + menuItems.length) % menuItems.length ||
+                  idx === (activeIndex + 1) % menuItems.length
+                ) {
+                  scale = 0.4;
+                  opacity = 0.15;
+                }
+
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.carouselItem,
+                      { transform: [{ scale }], opacity }
+                    ]}
+                  >
+                    {item.image ? (
+                      <Image
+                        source={{ uri: item.image }}
+                        style={styles.itemImage}
+                      />
+                    ) : (
+                      <View style={styles.imageFallback}>
+                        <Text style={styles.imageFallbackText}>VISUEL</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {currentItem && (
+            <View style={styles.quantityRow}>
+              <Pressable onPress={() => updateQuantity(-1)}>
+                <IconMinus />
+              </Pressable>
+
+              <Text style={styles.itemName}>
+                {currentItem.name}
+              </Text>
+
+              <Pressable onPress={() => updateQuantity(1)}>
+                <IconPlus />
+              </Pressable>
+            </View>
+          )}
+
+          {currentItem && (
+            <View style={styles.pickers}>
+              <Pressable
+                style={styles.pickerBtn}
+                onPress={() => {
+                  setShowSaucePicker(!showSaucePicker);
+                  setShowGarniturePicker(false);
+                }}
+              >
+                <Text style={styles.pickerText}>
+                  SAUCES ({selectedExtras.sauces.length})
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.pickerBtnWide}
+                onPress={() => {
+                  setShowGarniturePicker(!showGarniturePicker);
+                  setShowSaucePicker(false);
+                }}
+              >
+                <Text style={styles.pickerText}>GARNITURES</Text>
+                <IconPlus />
+              </Pressable>
+
+              <View style={styles.qtyBadge}>
+                <Text style={styles.qtyText}>{quantity}</Text>
+              </View>
+            </View>
+          )}
+
+          {showSaucePicker && (
+            <View style={styles.extrasDropdown}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {sauces.map((s) => (
+                  <Pressable 
+                    key={s.id} 
+                    onPress={() => toggleExtra('sauces', s)}
+                    style={[
+                      styles.extraItemVertical, 
+                      selectedExtras.sauces.find(x => x.id === s.id) && styles.extraItemActive
+                    ]}
+                  >
+                    {s.image ? (
+                      <Image source={{ uri: s.image }} style={styles.extraImageSmall} />
+                    ) : (
+                      <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
+                    )}
+                    <Text style={styles.extraItemText}>{s.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {showGarniturePicker && (
+            <View style={styles.extrasDropdown}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {garnitures.map((g) => (
+                  <Pressable 
+                    key={g.id} 
+                    onPress={() => toggleExtra('garnitures', g)}
+                    style={[
+                      styles.extraItemVertical, 
+                      selectedExtras.garnitures.find(x => x.id === g.id) && styles.extraItemActive
+                    ]}
+                  >
+                    {g.image ? (
+                      <Image source={{ uri: g.image }} style={styles.extraImageSmall} />
+                    ) : (
+                      <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
+                    )}
+                    <Text style={styles.extraItemText}>{g.name}</Text>
+                    <Text style={styles.extraPriceText}>+{g.price} F</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          
+          {currentItem && (
+            <Pressable style={styles.orderBtn} onPress={addToCart}>
+              <Text style={styles.orderText}>AJOUTER AU PANIER</Text>
+            </Pressable>
           )}
         </View>
 
-        {currentItem ? (
-          <Text style={styles.price}>
-            {totalPrice} <Text style={styles.priceUnit}>FCFA</Text>
-          </Text>
-        ) : (
-          <Text style={styles.emptyText}>
-            CONFIGUREZ VOTRE INTERFACE 
-          </Text>
-        )}
+        <Modal visible={view === 'checkout'} animationType="slide" transparent>
+          <View style={styles.checkoutOverlay}>
+            <View style={styles.checkoutSheet}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>MON PANIER</Text>
+                <Pressable onPress={() => setView('menu')} style={styles.closeSheet}>
+                  <IconX size={24} />
+                </Pressable>
+              </View>
 
-        {menuItems.length > 0 && (
-          <View style={styles.carousel}>
-
-            <Pressable style={styles.navLeft} onPress={prevItem}>
-              <IconChevronLeft size={44} />
-            </Pressable>
-
-            <Pressable style={styles.navRight} onPress={nextItem}>
-              <IconChevronRight size={44} />
-            </Pressable>
-
-            {menuItems.map((item, idx) => {
-              let scale = 0;
-              let opacity = 0;
-
-              if (idx === activeIndex) {
-                scale = 1.6;
-                opacity = 1;
-              } else if (
-                idx === (activeIndex - 1 + menuItems.length) % menuItems.length ||
-                idx === (activeIndex + 1) % menuItems.length
-              ) {
-                scale = 0.4;
-                opacity = 0.15;
-              }
-
-              return (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.carouselItem,
-                    { transform: [{ scale }], opacity }
-                  ]}
-                >
-                  {item.image ? (
-                    <Image
-                      source={{ uri: item.image }}
-                      style={styles.itemImage}
-                    />
-                  ) : (
-                    <View style={styles.imageFallback}>
-                      <Text style={styles.imageFallbackText}>VISUEL</Text>
+              <ScrollView style={styles.checkoutList}>
+                {cart.map((item) => (
+                  <View key={item.cartId} style={styles.checkoutCard}>
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardQty}>{item.quantity}x</Text>
+                      <View>
+                        <Text style={styles.cardName}>{item.name}</Text>
+                        <Text style={styles.cardExtras}>
+                          {[
+                            ...item.extras.sauces.map(s => s.name),
+                            ...item.extras.garnitures.map(g => g.name)
+                          ].join(' • ')}
+                        </Text>
+                      </View>
                     </View>
-                  )}
+                    <Text style={styles.cardPrice}>{item.totalPrice} F</Text>
+                    <Pressable 
+                      onPress={() => setCart(cart.filter(i => i.cartId !== item.cartId))}
+                      style={styles.removeItem}
+                    >
+                      <IconX size={14} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.sheetFooter}>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>TOTAL À PAYER</Text>
+                  <Text style={styles.totalValue}>
+                    {cart.reduce((s, i) => s + i.totalPrice, 0)} FCFA
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
-        )}
-
-        {currentItem && (
-          <View style={styles.quantityRow}>
-            <Pressable onPress={() => updateQuantity(-1)}>
-              <IconMinus />
-            </Pressable>
-
-            <Text style={styles.itemName}>
-              {currentItem.name}
-            </Text>
-
-            <Pressable onPress={() => updateQuantity(1)}>
-              <IconPlus />
-            </Pressable>
-          </View>
-        )}
-
-        {currentItem && (
-          <View style={styles.pickers}>
-
-            <Pressable
-              style={styles.pickerBtn}
-              onPress={() => {
-                setShowSaucePicker(!showSaucePicker);
-                setShowGarniturePicker(false);
-              }}
-            >
-              <Text style={styles.pickerText}>
-                SAUCES ({selectedExtras.sauces.length})
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.pickerBtnWide}
-              onPress={() => {
-                setShowGarniturePicker(!showGarniturePicker);
-                setShowSaucePicker(false);
-              }}
-            >
-              <Text style={styles.pickerText}>GARNITURES</Text>
-              <IconPlus />
-            </Pressable>
-
-            <View style={styles.qtyBadge}>
-              <Text style={styles.qtyText}>{quantity}</Text>
+                
+                <Pressable 
+                  style={[styles.confirmOrderBtn, cart.length === 0 && { opacity: 0.5 }]} 
+                  onPress={validateOrder}
+                  disabled={cart.length === 0}
+                >
+                  <Text style={styles.confirmOrderText}>VALIDER ET IMPRIMER</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        )}
+        </Modal>
 
-        {/* --- SÉLECTEUR DE SAUCES AVEC IMAGES --- */}
-        {showSaucePicker && (
-          <View style={styles.extrasDropdown}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {sauces.map((s) => (
-                <Pressable 
-                  key={s.id} 
-                  onPress={() => toggleExtra('sauces', s)}
-                  style={[
-                    styles.extraItemVertical, 
-                    selectedExtras.sauces.find(x => x.id === s.id) && styles.extraItemActive
-                  ]}
-                >
-                  {s.image ? (
-                    <Image source={{ uri: s.image }} style={styles.extraImageSmall} />
-                  ) : (
-                    <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
-                  )}
-                  <Text style={styles.extraItemText}>{s.name}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+        {orderSent && (
+          <View style={styles.orderSent}>
+            <IconCheck />
+            <Text style={styles.orderSentTitle}>
+              COMMANDE ENVOYÉE
+            </Text>
+            <Text style={styles.orderSentSubtitle}>
+              VEUILLEZ RETIRER VOTRE TICKET
+            </Text>
           </View>
         )}
 
-        {/* --- SÉLECTEUR DE GARNITURES AVEC IMAGES --- */}
-        {showGarniturePicker && (
-          <View style={styles.extrasDropdown}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {garnitures.map((g) => (
-                <Pressable 
-                  key={g.id} 
-                  onPress={() => toggleExtra('garnitures', g)}
-                  style={[
-                    styles.extraItemVertical, 
-                    selectedExtras.garnitures.find(x => x.id === g.id) && styles.extraItemActive
-                  ]}
+        <Modal visible={showPassModal} transparent>
+          <View style={styles.modal}>
+            <View style={styles.passBox}>
+              <IconLock />
+              <TextInput
+                secureTextEntry
+                style={styles.passInput}
+                value={passwordInput}
+                onChangeText={setPasswordInput}
+                placeholder="Code Corporation"
+                placeholderTextColor="#777"
+              />
+              <View style={styles.passActions}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={() => setShowPassModal(false)}
                 >
-                  {g.image ? (
-                    <Image source={{ uri: g.image }} style={styles.extraImageSmall} />
-                  ) : (
-                    <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>
-                  )}
-                  <Text style={styles.extraItemText}>{g.name}</Text>
-                  <Text style={styles.extraPriceText}>+{g.price} F</Text>
+                  <Text style={{color: 'white'}}>ANNULER</Text>
                 </Pressable>
-              ))}
-            </ScrollView>
+                <Pressable
+                  style={styles.confirmBtn}
+                  onPress={checkAdminAccess}
+                >
+                  <Text style={{color: 'black'}}>ENTRER</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
+        </Modal>
+
+        {view === 'settings' && (
+          <AdminPanel
+            styles={styles}
+            config={config}
+            setConfig={setConfig}
+            menuItems={menuItems}
+            setMenuItems={setMenuItems}
+            sauces={sauces}
+            setSauces={setSauces}
+            garnitures={garnitures}
+            setGarnitures={setGarnitures}
+            activeForm={activeForm}
+            setActiveForm={setActiveForm}
+            setView={setView}
+            orderHistory={orderHistory}
+            handleExportCSV={handleExportCSV}
+            handleImageUpload={handleImageUpload}
+          />
         )}
       </View>
-
-      <Modal visible={view === 'checkout'} animationType="slide" transparent>
-        <View style={styles.checkoutOverlay}>
-          <View style={styles.checkoutSheet}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>MON PANIER</Text>
-              <Pressable onPress={() => setView('menu')} style={styles.closeSheet}>
-                <IconX size={24} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={styles.checkoutList}>
-              {cart.map((item) => (
-                <View key={item.cartId} style={styles.checkoutCard}>
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardQty}>{item.quantity}x</Text>
-                    <View>
-                      <Text style={styles.cardName}>{item.name}</Text>
-                      <Text style={styles.cardExtras}>
-                        {[
-                          ...item.extras.sauces.map(s => s.name),
-                          ...item.extras.garnitures.map(g => g.name)
-                        ].join(' • ')}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.cardPrice}>{item.totalPrice} F</Text>
-                  <Pressable 
-                    onPress={() => setCart(cart.filter(i => i.cartId !== item.cartId))}
-                    style={styles.removeItem}
-                  >
-                    <IconX size={14} />
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
-
-            <View style={styles.sheetFooter}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>TOTAL À PAYER</Text>
-                <Text style={styles.totalValue}>
-                  {cart.reduce((s, i) => s + i.totalPrice, 0)} FCFA
-                </Text>
-              </View>
-              
-              <Pressable 
-                style={[styles.confirmOrderBtn, cart.length === 0 && { opacity: 0.5 }]} 
-                onPress={validateOrder}
-                disabled={cart.length === 0}
-              >
-                <Text style={styles.confirmOrderText}>VALIDER ET IMPRIMER</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {orderSent && (
-        <View style={styles.orderSent}>
-          <IconCheck />
-          <Text style={styles.orderSentTitle}>
-            COMMANDE ENVOYÉE
-          </Text>
-          <Text style={styles.orderSentSubtitle}>
-            VEUILLEZ RETIRER VOTRE TICKET
-          </Text>
-        </View>
-      )}
-
-      <Modal visible={showPassModal} transparent>
-        <View style={styles.modal}>
-          <View style={styles.passBox}>
-            <IconLock />
-            <TextInput
-              secureTextEntry
-              style={styles.passInput}
-              value={passwordInput}
-              onChangeText={setPasswordInput}
-              placeholder="Code Corporation"
-              placeholderTextColor="#777"
-            />
-            <View style={styles.passActions}>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => setShowPassModal(false)}
-              >
-                <Text>ANNULER</Text>
-              </Pressable>
-              <Pressable
-                style={styles.confirmBtn}
-                onPress={checkAdminAccess}
-              >
-                <Text>ENTRER</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {view === 'settings' && (
-        <AdminPanel
-          styles={styles}
-          config={config}
-          setConfig={setConfig}
-          menuItems={menuItems}
-          setMenuItems={setMenuItems}
-          sauces={sauces}
-          setSauces={setSauces}
-          garnitures={garnitures}
-          setGarnitures={setGarnitures}
-          activeForm={activeForm}
-          setActiveForm={setActiveForm}
-          setView={setView}
-          orderHistory={orderHistory}
-          handleExportCSV={handleExportCSV}
-          handleImageUpload={handleImageUpload}
-        />
-      )}
-
     </View>
-  </View>
-);
+  );
 }
 
 const styles = StyleSheet.create({
@@ -1081,17 +1088,16 @@ const styles = StyleSheet.create({
 
   price: { 
     textAlign: 'center', 
-    fontSize: 52,           // Augmenté de 36 à 52 pour une meilleure visibilité
+    fontSize: 52,
     fontWeight: '900', 
     color: '#f97316',
-    // Petit effet de lueur pour faire ressortir le chiffre
     textShadowColor: 'rgba(249, 115, 22, 0.3)',
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 10,
     marginVertical: 10 
   },
   priceUnit: { 
-    fontSize: 18,           // Augmenté de 12 à 18 pour être lisible
+    fontSize: 18,
     color: '#f97316',
     fontWeight: '700',
     marginLeft: 5
@@ -1099,7 +1105,6 @@ const styles = StyleSheet.create({
 
   emptyText:{ textAlign:'center', color:'#444', fontWeight:'900' },
 
-  // ... suite et fin du bloc styles (à vérifier dans ton éditeur)
   carousel: { height: 260, justifyContent: 'center', alignItems: 'center' },
   carouselItem: { position: 'absolute' },
   itemImage: { 
@@ -1107,12 +1112,11 @@ const styles = StyleSheet.create({
     height: 180, 
     resizeMode: 'contain',
     backgroundColor: 'transparent',
-    // --- EFFET HALO LUMINEUX ---
-    shadowColor: "#f97316",    // Utilise le orange de Ninja's Fries
+    shadowColor: "#f97316",
     shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.4,        // Intensité de la lueur
-    shadowRadius: 25,          // Diffusion du halo
-    elevation: 10              // Pour l'effet d'ombre sur Android
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
+    elevation: 10
   },
   imageFallback: { 
     width: 160, 
@@ -1123,18 +1127,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272a' 
   },
-  // ... (tes autres styles au dessus)
   imageFallbackText:{ textAlign:'center', color:'#555', fontWeight:'900' },
   
-  // Assure-toi que toutes les classes de styles suivantes sont bien présentes avant de fermer :
-  navLeft:{ position:'absolute', left:-10 },
-  navRight:{ position:'absolute', right:-10 },
+  navLeft:{ position:'absolute', left:-10, zIndex: 10 },
+  navRight:{ position:'absolute', right:-10, zIndex: 10 },
   quantityRow:{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:12 },
   itemName:{ color:'#fff', fontWeight:'900', fontSize:14, textAlign:'center', maxWidth:200 },
   pickers:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
   pickerBtn:{ flex:1, borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
-  pickerBtnWide:{ flex:1.2, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30 },
+  pickerBtnWide:{ flex:1.2, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:'#27272a', padding:10, borderRadius:30, marginLeft: 10 },
   pickerText:{ color:'#777', fontWeight:'900', fontSize:10 },
+  extrasDropdown: { marginTop: 10 },
   extraItemVertical: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1142,8 +1145,10 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: '#27272a',
     marginRight: 12,
-    width: 90, // Largeur fixe pour que ce soit bien aligné
+    width: 90,
   },
+  extraItemActive: { borderColor: '#f97316', borderWidth: 1 },
+  extraItemText: { color: '#fff', fontSize: 10, textAlign: 'center' },
   extraImageSmall: {
     width: 50,
     height: 50,
@@ -1206,10 +1211,10 @@ const styles = StyleSheet.create({
   totalValue: { color: '#f97316', fontSize: 24, fontWeight: '900' },
   confirmOrderBtn: { backgroundColor: '#f97316', padding: 20, borderRadius: 20, alignItems: 'center' },
   confirmOrderText: { color: '#000', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
-  qtyBadge:{ width:32, height:32, borderRadius:16, backgroundColor:'#18181b', justifyContent:'center' },
+  qtyBadge:{ width:32, height:32, borderRadius:16, backgroundColor:'#18181b', justifyContent:'center', marginLeft: 10 },
   qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900' },
-  orderBtn:{ backgroundColor:'#f97316', padding:16, borderRadius:30 },
-  orderText:{ textAlign:'center', fontWeight:'900', letterSpacing:3 },
+  orderBtn:{ backgroundColor:'#f97316', padding:16, borderRadius:30, marginTop: 20 },
+  orderText:{ textAlign:'center', fontWeight:'900', letterSpacing:3, color: '#000' },
   modal:{ flex:1, backgroundColor:'rgba(0,0,0,0.9)', justifyContent:'center', padding:20 },
   closeModal:{ position:'absolute', top:30, right:20 },
   cartList:{ marginTop:60 },
@@ -1218,11 +1223,11 @@ const styles = StyleSheet.create({
   cartItemPrice:{ color:'#f97316', fontWeight:'900', fontSize:10 },
   validateBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:30, marginTop:20 },
   validateText:{ textAlign:'center', fontWeight:'900' },
-  orderSent:{ ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(249,115,22,0.9)', justifyContent:'center', alignItems:'center' },
-  orderSentTitle:{ fontSize:28, fontWeight:'900', marginTop:20 },
-  orderSentSubtitle:{ fontSize:10, fontWeight:'900', marginTop:10 },
-  passBox:{ backgroundColor:'#18181b', padding:30, borderRadius:40 },
-  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:14, borderRadius:20, marginVertical:20, textAlign:'center' },
+  orderSent:{ ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(249,115,22,0.9)', justifyContent:'center', alignItems:'center', zIndex: 200 },
+  orderSentTitle:{ fontSize:28, fontWeight:'900', marginTop:20, color: '#000' },
+  orderSentSubtitle:{ fontSize:10, fontWeight:'900', marginTop:10, color: '#000' },
+  passBox:{ backgroundColor:'#18181b', padding:30, borderRadius:40, alignItems: 'center' },
+  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:14, borderRadius:20, marginVertical:20, textAlign:'center', width: '100%' },
   passActions:{ flexDirection:'row', gap:10 },
   cancelBtn:{ flex:1, backgroundColor:'#27272a', padding:14, borderRadius:20, alignItems:'center' },
   confirmBtn:{ flex:1, backgroundColor:'#f97316', padding:14, borderRadius:20, alignItems:'center' },
@@ -1257,7 +1262,6 @@ const styles = StyleSheet.create({
   historyItem:{ marginBottom:4 },
   historyItemText:{ color:'#fff', fontSize:10 },
   historyExtras:{ color:'#777', fontSize:9 },
-  /* --- STYLES DES CARTES DE GESTION --- */
   adminHorizontalCard: {
     flexDirection: 'row',
     backgroundColor: '#18181b',
@@ -1310,4 +1314,4 @@ const styles = StyleSheet.create({
     fontWeight: '900' 
   },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:20 }
-}); // ICI : on ferme StyleSheet.create
+});
