@@ -179,11 +179,13 @@ export const exportOrdersToCSV = async (orderHistory) => {
 export default function App() {
   /* ===================== ADAPTATION ÉCRAN ===================== */
   const { width } = useWindowDimensions();
-  // eslint-disable-next-line no-unused-vars
-  const isTablet = width > 768; // Détecte si l'appareil est une tablette
+  const isTablet = width > 768;
 
-  /* ===================== ÉTATS ===================== */
+  /* ===================== ÉTATS (STATES) ===================== */
   const [view, setView] = useState('menu');
+  const [appColor, setAppColor] = useState('#6200ee'); // Couleur persistante du jour
+  const [logoUri, setLogoUri] = useState(null);
+  
   const [activeIndex, setActiveIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [showSaucePicker, setShowSaucePicker] = useState(false);
@@ -191,11 +193,6 @@ export default function App() {
   const [orderSent, setOrderSent] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
-
-  const [config, setConfig] = useState({
-    logoUrl: '',
-    qrCodeUrl: null
-  });
 
   const [menuItems, setMenuItems] = useState([]);
   const [sauces, setSauces] = useState([]);
@@ -211,51 +208,46 @@ export default function App() {
   const [activeForm, setActiveForm] = useState(null);
   const [editingId, setEditingId] = useState(null);
 
-  /* ===================== PERSISTENCE ===================== */
+  /* ===================== PERSISTENCE SQL (Nouveau Bloc) ===================== */
   
-  // Chargement initial
   useEffect(() => {
-    const loadData = async () => {
+    const initApp = async () => {
       try {
-        const savedMenu = await AsyncStorage.getItem('@menu_items');
-        const savedSauces = await AsyncStorage.getItem('@sauces');
-        const savedGarnitures = await AsyncStorage.getItem('@garnitures');
-        const savedHistory = await AsyncStorage.getItem('@order_history');
-        const savedConfig = await AsyncStorage.getItem('@app_config');
+        // 1. Initialise les tables si elles n'existent pas
+        Database.init();
 
-        if (savedMenu) setMenuItems(JSON.parse(savedMenu));
-        if (savedSauces) setSauces(JSON.parse(savedSauces));
-        if (savedGarnitures) setGarnitures(JSON.parse(savedGarnitures));
-        if (savedHistory) setOrderHistory(JSON.parse(savedHistory));
-        if (savedConfig) setConfig(JSON.parse(savedConfig));
+        // 2. Charge la couleur du jour (fixe pour 24h)
+        const dailyColor = Database.getDailyColor();
+        setAppColor(dailyColor);
+
+        // 3. Charge le logo permanent
+        const savedLogo = Database.getSetting('logo_uri');
+        if (savedLogo) setLogoUri(savedLogo);
+
+        // 4. Charge les produits depuis SQL
+        const dbPlats = Database.getProducts('plat');
+        const dbSauces = Database.getProducts('sauce');
+        const dbGarnitures = Database.getProducts('garniture');
+        
+        setMenuItems(dbPlats);
+        setSauces(dbSauces);
+        setGarnitures(dbGarnitures);
+
+        // 5. Charge l'historique des ventes
+        const sales = Database.getSales();
+        setOrderHistory(sales);
+
       } catch (e) {
-        console.error("Erreur de chargement", e);
+        console.error("Erreur d'initialisation SQL :", e);
       }
     };
-    loadData();
+
+    initApp();
   }, []);
 
-  // Sauvegarde automatique
-  useEffect(() => {
-    AsyncStorage.setItem('@menu_items', JSON.stringify(menuItems));
-  }, [menuItems]);
-
-  useEffect(() => {
-    AsyncStorage.setItem('@sauces', JSON.stringify(sauces));
-  }, [sauces]);
-
-  useEffect(() => {
-    AsyncStorage.setItem('@garnitures', JSON.stringify(garnitures));
-  }, [garnitures]);
-
-  useEffect(() => {
-    AsyncStorage.setItem('@order_history', JSON.stringify(orderHistory));
-  }, [orderHistory]);
-
-  useEffect(() => {
-    AsyncStorage.setItem('@app_config', JSON.stringify(config));
-  }, [config]);
-
+  // NOTE : Les anciens useEffect avec AsyncStorage.setItem ont été supprimés.
+  // La sauvegarde se fera désormais par des appels directs à Database.saveProduct()
+  // ou Database.saveSale() lors des actions utilisateur.
   /* ===================== NAVIGATION + QUANTITÉ ===================== */
   const nextItem = () => {
     if (menuItems.length === 0) return;
