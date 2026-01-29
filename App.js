@@ -136,22 +136,33 @@ export const buildEscPosTicket = (order) => {
   let ticket = '';
   ticket += '\x1B\x40'; // init
   ticket += '\x1B\x61\x01'; // center
-  ticket += 'NINJA\'S FRIES\n\n';
+  ticket += "NINJA'S FRIES\n\n";
   ticket += '\x1B\x61\x00'; // left
+
   order.items.forEach(item => {
     ticket += `${item.quantity}x ${item.name}\n`;
-    item.extras.sauces.forEach(s => ticket += `  - Sauce: ${s.name}\n`);
-    item.extras.garnitures.forEach(g => ticket += `  - Garniture: ${g.name}\n`);
+
+    const extras = item.extras || {};
+    const sauces = Array.isArray(extras.sauces) ? extras.sauces : [];
+    const garnitures = Array.isArray(extras.garnitures) ? extras.garnitures : [];
+
+    sauces.forEach(s => {
+      if (s?.name) ticket += `  - Sauce: ${s.name}\n`;
+    });
+
+    garnitures.forEach(g => {
+      if (g?.name) ticket += `  - Garniture: ${g.name}\n`;
+    });
   });
+
   ticket += '\n--------------------------\n';
   ticket += `TOTAL: ${order.total} FCFA\n\n`;
   ticket += '\x1D\x56\x00'; // cut
   return ticket;
 };
-
-export const sendTicketToPrinter = async (device, serviceUUID, characteristicUUID, ticketString) => {
-  const base64Data = Buffer.from(ticketString, 'ascii').toString('base64');
-  await device.writeCharacteristicWithResponseForService(serviceUUID, characteristicUUID, base64Data);
+export const sendTicketToPrinter = async (printer, serviceUUID, characteristicUUID, ticket) => {
+  const base64Data = Buffer.from(ticket, 'ascii').toString('base64');
+  await printer.writeCharacteristicWithResponseForService(serviceUUID, characteristicUUID, base64Data);
 };
 
 export const printOrderViaBLE = async (order) => {
@@ -357,15 +368,12 @@ export default function App() {
 
   setOrderHistory([orderData, ...orderHistory]);
   
-  // --- GÉNÉRATION DU TEXTE DU TICKET ---
-  const ticketText = generateTicket(orderData); 
-  console.log("Texte prêt pour l'imprimante :\n", ticketText);
 
   setCart([]);
 
   try {
     // On envoie le texte généré à ton imprimante
-    await printOrderViaBLE(ticketText); 
+   await printOrderViaBLE(orderData); 
     console.log('Commande imprimée avec succès');
   } catch (err) {
     console.warn('Impossible d\'imprimer la commande', err);
@@ -384,27 +392,6 @@ export default function App() {
   const handleExportCSV = async () => {
     await exportOrdersToCSV(orderHistory);
   };
-// --- GÉNÉRATEUR DE TEXTE POUR TICKET ---
-  const generateTicket = (order) => {
-    const separator = "--------------------------------";
-    let t = "      NINJA'S FRIES\n";
-    t += `Date: ${order.date} ${order.time}\n`;
-    t += `Commande: #${order.id.toString().slice(-4)}\n`;
-    t += separator + "\n";
-
-    order.items.forEach(it => {
-      // On garde totalPrice ici car c'est le prix par ligne d'article
-      t += `${it.quantity}x ${it.name} - ${it.totalPrice} F\n`;
-      if (it.extras.sauces.length > 0) t += ` S: ${it.extras.sauces.map(s => s.name).join(',')}\n`;
-      if (it.extras.garnitures.length > 0) t += ` G: ${it.extras.garnitures.map(g => g.name).join(',')}\n`;
-    });
-
-    t += separator + "\n";
-    // ON UTILISE .total POUR CORRESPONDRE À TON OBJET orderData
-    t += `TOTAL: ${order.total} FCFA\n`; 
-    t += separator + "\n\n\n";
-    return t;
-};
 const AdminPanel = ({
   styles,
   config,
