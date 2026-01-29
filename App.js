@@ -334,32 +334,53 @@ export default function App() {
 
   /* ===================== VALIDATION COMMANDE ===================== */
   const validateOrder = async () => {
+  if (cart.length === 0) return;
+
+  const total = cart.reduce((s, i) => s + i.totalPrice, 0);
   const orderData = {
     id: Date.now(),
-    date: new Date().toLocaleDateString(),
-    time: new Date().toLocaleTimeString(),
+    date: new Date().toLocaleDateString('fr-FR'),
+    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
     items: [...cart],
-    total: cart.reduce((s, i) => s + i.totalPrice, 0),
-    status: 'en_attente'
+    total: total,
+    status: 'payé'
   };
 
-  setOrderHistory([orderData, ...orderHistory]);
-  setCart([]);
-
   try {
-    // On envoie le texte généré à ton imprimante
-    await printOrderViaBLE(orderData); 
-    console.log('Commande imprimée avec succès');
-  } catch (err) {
-    console.warn('Impossible d\'imprimer la commande', err);
+    // 1. SAUVEGARDE DANS SQLITE (Pour la persistance)
+    // On transforme les items en JSON string car SQLite ne stocke pas de tableaux
+    Database.insertOrder(
+      JSON.stringify(orderData.items),
+      orderData.total,
+      orderData.date,
+      orderData.time
+    );
+
+    // 2. MISE À JOUR DE L'INTERFACE (État React)
+    // On recharge l'historique depuis la DB pour être sûr d'avoir les données réelles
+    setOrderHistory(Database.getOrders());
+    setCart([]);
+    setOrderSent(true);
+
+    // 3. IMPRESSION BLUETOOTH (BLE)
+    try {
+      await printOrderViaBLE(orderData);
+      console.log('Commande imprimée avec succès');
+    } catch (err) {
+      console.warn('Echec impression, mais commande sauvegardée:', err);
+      // Optionnel: Alert.alert("Imprimante", "Vérifiez la connexion Bluetooth.");
+    }
+
+    // 4. RETOUR AU MENU
+    setTimeout(() => {
+      setOrderSent(false);
+      setView('menu');
+    }, 4000);
+
+  } catch (sqlError) {
+    console.error("Erreur critique SQL:", sqlError);
+    Alert.alert("Erreur", "La commande n'a pas pu être enregistrée en base de données.");
   }
-
-  setOrderSent(true);
-
-  setTimeout(() => {
-    setOrderSent(false);
-    setView('menu');
-  }, 4000);
 };
 
   /* ===================== EXPORT CSV ===================== */
@@ -459,11 +480,21 @@ export default function App() {
             // 1. Suppression physique dans SQLite
             Database.deleteProduct(item.id);
 
-            // 2. Rafraîchissement des listes à l'écran
-            setMenuItems(Database.getProducts('plat'));
-            setSauces(Database.getProducts('sauce'));
-            setGarnitures(Database.getProducts('garniture'));
-            
+            // 2. Rafraîchissement immédiat des listes via SQLite
+            const updatedPlats = Database.getProducts('plat');
+            const updatedSauces = Database.getProducts('sauce');
+            const updatedGarnitures = Database.getProducts('garniture');
+
+            setMenuItems(updatedPlats);
+            setSauces(updatedSauces);
+            setGarnitures(updatedGarnitures);
+
+            // 3. Sécurité : Si on supprimait un item en cours d'édition
+            if (editingId === item.id) {
+              setEditingId(null);
+              setFormItem({ name: '', price: '', image: '', type: 'plat' });
+            }
+
           } catch (error) {
             console.error("Erreur suppression SQL:", error);
             Alert.alert("Erreur", "Impossible de supprimer l'article.");
