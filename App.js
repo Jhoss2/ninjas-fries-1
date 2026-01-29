@@ -1,38 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  Image,
-  Pressable,
-  TextInput,
-  ScrollView,
-  Modal,
-  StyleSheet,
-  Platform,
-  useWindowDimensions,
-  Alert
+  View, Text, Image, Pressable, TextInput, ScrollView,
+  Modal, StyleSheet, Platform, useWindowDimensions, Alert
 } from 'react-native';
-
-import Svg, {
-  Line,
-  Polyline,
-  Rect,
-  Path,
-  Circle
-} from 'react-native-svg';
+import Svg, { Line, Polyline, Rect, Path, Circle } from 'react-native-svg';
 
 import * as ImagePicker from 'expo-image-picker';
 import { BleManager } from 'react-native-ble-plx';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Buffer } from 'buffer';
 
-/* ===================== CONSTANTES ===================== */
+// IMPORT UNIQUE POUR LA PERSISTANCE
+import { Database } from './Database'; 
 
+/* ===================== CONSTANTES ===================== */
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID   = '00002af1-0000-1000-8000-00805f9b34fb';
 
+// Ta liste de couleurs est conservée pour la génération aléatoire
 const DAILY_COLORS = [
   '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
   '#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1',
@@ -40,7 +26,6 @@ const DAILY_COLORS = [
   '#fb923c','#fbbf24','#a3e635','#4ade80','#34d399','#2dd4bf',
   '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
 ];
-
 /* ===================== ICÔNES ===================== */
 
 const IconPlus = () => (
