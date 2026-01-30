@@ -784,7 +784,7 @@ pickerBtnWide: {
   successSubtitle: { fontSize: 14, fontWeight: '900', color: '#fff', marginTop: 10 },
   modal:{ flex:1, backgroundColor:'rgba(0,0,0,0.9)', justifyContent:'center', padding:20 },
   passBox:{ backgroundColor:'#18181b', padding:35, borderRadius:45, alignItems: 'center' },
-  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginVertical:25, textAlign:'center', width: '100%', fontSize: 18 },
+  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginVertical:25, textAlign:'center', width: '100%', fontSize: 18, fontWeight:'900', fontStyle: 'italic' },
   passActions:{ flexDirection:'row', gap:15 },
   cancelBtn:{ flex:1, backgroundColor:'#27272a', padding:16, borderRadius:25, alignItems:'center' },
   confirmBtn:{ flex:1, backgroundColor:'#f97316', padding:16, borderRadius:25, alignItems:'center' },
@@ -826,5 +826,8 @@ pickerBtnWide: {
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   actionEdit: { backgroundColor: '#27272a', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f6' },
   actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
+  // À ajouter à la fin de ton bloc StyleSheet.create({ ... })
+  cancelText: { color: '#ffffff', fontWeight: '900', fontStyle: 'italic' },
+  confirmText: { color: '#ffffff', fontWeight: '900', fontStyle: 'italic' },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
 });
