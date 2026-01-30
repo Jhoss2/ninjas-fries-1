@@ -723,9 +723,30 @@ const styles = StyleSheet.create({
   qtyBtn: { padding: 10 },
   itemName:{ color:'#f97316', fontWeight:'900', fontSize: 34, textAlign:'center', maxWidth:250, fontStyle: 'italic' },
   pickers:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop: 10 },
-  pickerBtn:{ flex:1, borderWidth:1, borderColor:'#27272a', padding:12, borderRadius:30 },
-  pickerBtnWide:{ flex:1.2, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:'#27272a', padding:12, borderRadius:30, marginLeft: 10 },
-  pickerText:{ color:'#777', fontWeight:'900', fontSize:12, fontStyle: 'italic' },
+  pickerBtn: { 
+  flex: 1, 
+  height: 45,               // Force la hauteur
+  borderWidth: 1, 
+  borderColor: '#fff', 
+  paddingHorizontal: 15,    // Padding sur les côtés uniquement
+  borderRadius: 30,
+  justifyContent: 'center', // Centre le texte verticalement
+  alignItems: 'center'      // Centre le texte horizontalement (si pas de flèche)
+},
+
+pickerBtnWide: { 
+  flex: 1.2, 
+  height: 45,               // Même hauteur que l'autre
+  flexDirection: 'row', 
+  alignItems: 'center', 
+  justifyContent: 'space-between', 
+  borderWidth: 1, 
+  borderColor: '#fff', 
+  paddingHorizontal: 15,    // Même padding
+  borderRadius: 30, 
+  marginLeft: 10 
+},
+  pickerText:{ color:'#fff', fontWeight:'900', fontSize:12, fontStyle: 'italic' },
   extrasDropdown: { marginTop: 15 },
   extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 100, overflow: 'visible' },
   extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
