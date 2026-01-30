@@ -777,7 +777,7 @@ pickerBtnWide: {
   qtyBadge:{ width:36, height:36, borderRadius:18, backgroundColor:'#18181b', justifyContent:'center', marginLeft: 10, borderWidth: 1, borderColor: '#27272a' },
   qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900', fontSize: 16 },
   orderBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:35, marginTop: 20 },
-  orderText:{ textAlign:'center', fontWeight:'900', letterSpacing:2, color: '#fff', fontSize: 16 },
+  orderText:{ textAlign:'center', fontWeight:'900', letterSpacing:2, color: '#fff', fontSize: 16, fontStyle: 'italic' },
   successScreen: { ...StyleSheet.absoluteFillObject, backgroundColor: '#f97316', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   successIconContainer: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   successTitle: { fontSize: 32, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
