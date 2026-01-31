@@ -26,11 +26,19 @@ export const Database = {
         items TEXT NOT NULL,
         total INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS cart_table (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        productId INTEGER,
+        name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        totalPrice INTEGER NOT NULL,
+        extras TEXT
+      );
     `);
   },
 
   /**
-   * Récupère la couleur du jour ou en génère une nouvelle si elle n'existe pas pour aujourd'hui.
+   * Gestion de la couleur du jour.
    */
   getDailyColor: () => {
     const today = new Date().toLocaleDateString('fr-FR');
@@ -53,7 +61,7 @@ export const Database = {
   },
 
   /**
-   * Gère les paramètres (settings) comme logoUrl, qrCodeUrl, etc.
+   * Gestion des paramètres (settings).
    */
   getSetting: (key) => {
     const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [key]);
@@ -65,7 +73,7 @@ export const Database = {
   },
 
   /**
-   * Gestion des produits (plats, sauces, garnitures).
+   * Gestion des produits.
    */
   getProducts: (type) => {
     return db.getAllSync('SELECT * FROM products WHERE type = ?', [type]);
@@ -81,6 +89,33 @@ export const Database = {
 
   deleteProduct: (id) => {
     db.runSync('DELETE FROM products WHERE id = ?', [id]);
+  },
+
+  /**
+   * Gestion du PANIER (cart_table) - Requis par le nouveau guide.
+   */
+  addToCart: (productId, name, quantity, totalPrice, extrasJson) => {
+    db.runSync(
+      'INSERT INTO cart_table (productId, name, quantity, totalPrice, extras) VALUES (?, ?, ?, ?, ?)',
+      [productId, name, quantity, totalPrice, extrasJson]
+    );
+  },
+
+  getCartItems: () => {
+    return db.getAllSync('SELECT * FROM cart_table');
+  },
+
+  getCartTotal: () => {
+    const result = db.getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
+    return result ? result.grandTotal || 0 : 0;
+  },
+
+  removeFromCart: (id) => {
+    db.runSync('DELETE FROM cart_table WHERE id = ?', [id]);
+  },
+
+  clearCart: () => {
+    db.runSync('DELETE FROM cart_table');
   },
 
   /**
