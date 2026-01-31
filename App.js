@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Image, Pressable, TextInput, ScrollView,
-  Modal, StyleSheet, Platform, useWindowDimensions, Alert
+  Modal, StyleSheet, Platform, useWindowDimensions, Alert,
+  Animated, SafeAreaView, Dimensions
 } from 'react-native';
 import Svg, { Line, Polyline, Rect, Path, Circle } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,9 +10,13 @@ import { BleManager } from 'react-native-ble-plx';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Buffer } from 'buffer';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
 
 // IMPORT UNIQUE POUR LA PERSISTANCE
 import { Database } from './Database';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /* ===================== CONSTANTES ===================== */
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
@@ -167,19 +172,107 @@ export const exportOrdersToCSV = async (orderHistory) => {
   await Sharing.shareAsync(fileUri);
 };
 
-export default function App() {
-  /* ===================== ADAPTATION ÉCRAN ===================== */
-  const { width } = useWindowDimensions();
-  const isTablet = width > 768;
+/* ===================== COMPOSANT CHECKOUT (SQLITE) ===================== */
+const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
+  const [cartItems, setCartItems] = useState([]);
+  const [totalAmount, setTotalAmount] = useState(0);
 
-  /* ===================== ÉTATS (STATES) ===================== */
+  useEffect(() => {
+    refreshCart();
+  }, []);
+
+  const refreshCart = () => {
+    const items = Database.getCartItems();
+    const total = Database.getCartTotal();
+    setCartItems(items);
+    setTotalAmount(total);
+  };
+
+  const handleRemove = (id) => {
+    Database.removeFromCart(id);
+    refreshCart();
+    onRemoveItem(id);
+  };
+
+  return (
+    <View style={styles.overlay}>
+      <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.container}>
+        <Pressable style={styles.closeButton} onPress={onClose}>
+          <IconX size={24} color="white" />
+        </Pressable>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerSection}>
+            <Text style={styles.checkoutTitleText}>VÉRIFIEZ VOTRE COMMANDE</Text>
+            <View style={styles.headerSeparator} />
+          </View>
+
+          <View style={styles.itemsList}>
+            {cartItems.map((item, index) => {
+              const extras = JSON.parse(item.extras || '{}');
+              return (
+                <View key={item.id} style={styles.itemRow}>
+                  <View style={styles.itemMainLine}>
+                    <View style={styles.itemHeader}>
+                      <View style={styles.itemNameContainer}>
+                        <Text style={styles.orangeText}>{item.quantity}X </Text>
+                        <Text style={styles.whiteText}>{item.name.toUpperCase()}</Text>
+                      </View>
+                      <Text style={styles.itemPrice}>{item.totalPrice} F</Text>
+                    </View>
+                    <Pressable style={styles.removeRowButton} onPress={() => handleRemove(item.id)}>
+                      <IconX size={14} color="white" />
+                    </Pressable>
+                  </View>
+                  <View style={styles.extrasContainer}>
+                    {extras.sauces?.length > 0 && (
+                      <Text style={styles.extraDetailText}>
+                        SAUCES: <Text style={styles.orangeExtraValue}>{extras.sauces.map(s => s.name.toUpperCase()).join(', ')}</Text>
+                      </Text>
+                    )}
+                    {extras.garnitures?.length > 0 && (
+                      <Text style={styles.extraDetailText}>
+                        GARNITURES: <Text style={styles.orangeExtraValue}>{extras.garnitures.map(g => g.name.toUpperCase()).join(', ')}</Text>
+                      </Text>
+                    )}
+                  </View>
+                  {index < cartItems.length - 1 && <View style={styles.separator} />}
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.whiteCard}>
+            <View style={styles.qrWrapper}>
+              {config.qrCodeUrl ? (
+                <Image source={{ uri: config.qrCodeUrl }} style={styles.qrImage} resizeMode="contain" />
+              ) : (
+                <Text style={{color: '#ccc', fontSize: 12}}>QR CODE</Text>
+              )}
+            </View>
+            <View style={styles.totalSection}>
+              <Text style={styles.totalLabel}>TOTAL À PAYER</Text>
+              <Text style={styles.totalValue}>{totalAmount} FCFA</Text>
+            </View>
+          </View>
+
+          <Pressable style={styles.confirmButton} onPress={onConfirm}>
+            <Text style={styles.confirmButtonText}>VALIDER LA COMMANDE</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+};
+
+/* ===================== COMPOSANT PRINCIPAL (APP) ===================== */
+export default function App() {
+  const { width } = useWindowDimensions();
+  const [splashVisible, setSplashVisible] = useState(true);
   const [view, setView] = useState('menu');
   const [appColor, setAppColor] = useState('#6200ee'); 
-  const [config, setConfig] = useState({
-    logoUrl: '',
-    qrCodeUrl: ''
-  });
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [config, setConfig] = useState({ logoUrl: '', qrCodeUrl: '' });
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [showSaucePicker, setShowSaucePicker] = useState(false);
   const [showGarniturePicker, setShowGarniturePicker] = useState(false);
@@ -189,30 +282,21 @@ export default function App() {
   const [menuItems, setMenuItems] = useState([]);
   const [sauces, setSauces] = useState([]);
   const [garnitures, setGarnitures] = useState([]);
-  const [selectedExtras, setSelectedExtras] = useState({
-    sauces: [],
-    garnitures: []
-  });
-  const [cart, setCart] = useState([]);
+  const [selectedExtras, setSelectedExtras] = useState({ sauces: [], garnitures: [] });
   const [orderHistory, setOrderHistory] = useState([]);
   const [activeForm, setActiveForm] = useState(null);
   const [editingId, setEditingId] = useState(null);
 
-  /* ===================== PERSISTENCE SQL ===================== */
+  const scrollX = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const initApp = async () => {
       try {
         Database.init();
-        const dailyColor = Database.getDailyColor();
-        setAppColor(dailyColor);
-        
+        setAppColor(Database.getDailyColor());
         const savedLogo = Database.getSetting('logoUrl');
         const savedQr = Database.getSetting('qrCodeUrl');
-        setConfig({
-          logoUrl: savedLogo || '',
-          qrCodeUrl: savedQr || ''
-        });
-
+        setConfig({ logoUrl: savedLogo || '', qrCodeUrl: savedQr || '' });
         setMenuItems(Database.getProducts('plat'));
         setSauces(Database.getProducts('sauce'));
         setGarnitures(Database.getProducts('garniture'));
@@ -224,466 +308,229 @@ export default function App() {
     initApp();
   }, []);
 
-  /* ===================== NAVIGATION + QUANTITÉ ===================== */
-  const nextItem = () => {
-    if (menuItems.length === 0) return;
-    setActiveIndex((prev) => (prev + 1) % menuItems.length);
-    setQuantity(1);
-    resetExtras();
-  };
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    {
+      useNativeDriver: false,
+      listener: (event) => {
+        const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH * 0.8));
+        if (index !== currentIndex && index >= 0 && index < menuItems.length) {
+          setCurrentIndex(index);
+          setQuantity(1);
+          resetExtras();
+        }
+      },
+    }
+  );
 
-  const prevItem = () => {
-    if (menuItems.length === 0) return;
-    setActiveIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length);
-    setQuantity(1);
-    resetExtras();
-  };
-
-  const updateQuantity = (val) => {
-    setQuantity((prev) => Math.max(1, prev + val));
-  };
-
+  const updateQuantity = (val) => setQuantity((prev) => Math.max(1, prev + val));
   const resetExtras = () => {
     setSelectedExtras({ sauces: [], garnitures: [] });
     setShowSaucePicker(false);
     setShowGarniturePicker(false);
   };
 
-  /* ===================== IMAGE UPLOAD ===================== */
   const handleImageUpload = async (callback) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission nécessaire pour accéder aux photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      base64: true
-    });
-    if (!result.canceled) {
-      const base64 = result.assets[0].base64;
-      callback(`data:image/jpeg;base64,${base64}`);
-    }
+    if (status !== 'granted') { alert('Permission nécessaire'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, base64: true });
+    if (!result.canceled) callback(`data:image/jpeg;base64,${result.assets[0].base64}`);
   };
 
-  /* ===================== EXTRAS ===================== */
   const toggleExtra = (type, item) => {
     const list = selectedExtras[type];
     const exists = list.find((i) => i.id === item.id);
-    if (exists) {
-      setSelectedExtras({
-        ...selectedExtras,
-        [type]: list.filter((i) => i.id !== item.id)
-      });
-    } else {
-      setSelectedExtras({
-        ...selectedExtras,
-        [type]: [...list, item]
-      });
-    }
+    setSelectedExtras({ ...selectedExtras, [type]: exists ? list.filter((i) => i.id !== item.id) : [...list, item] });
   };
 
-  /* ===================== ADMIN ACCESS ===================== */
   const checkAdminAccess = () => {
     if (passwordInput === "NINJA'S CORPORATION") {
-      setView('settings');
-      setShowPassModal(false);
-      setPasswordInput('');
-    } else {
-      console.warn('Mot de passe incorrect');
-    }
+      setView('settings'); setShowPassModal(false); setPasswordInput('');
+    } else console.warn('Mot de passe incorrect');
   };
 
-  /* ===================== CALCULS ===================== */
-  const currentItem = menuItems.length > 0 ? menuItems[activeIndex] : null;
-  const extrasPrice = selectedExtras.garnitures.reduce(
-    (sum, g) => sum + (g.price || 0),
-    0
-  );
+  const currentItem = menuItems.length > 0 ? menuItems[currentIndex] : null;
+  const extrasPrice = selectedExtras.garnitures.reduce((sum, g) => sum + (g.price || 0), 0);
   const unitPrice = currentItem ? currentItem.price + extrasPrice : 0;
   const totalPrice = unitPrice * quantity;
 
-  /* ===================== VALIDATION COMMANDE ===================== */
   const validateOrder = async () => {
-    if (cart.length === 0) return;
-    const total = cart.reduce((s, i) => s + i.totalPrice, 0);
+    const cartItems = Database.getCartItems();
+    if (cartItems.length === 0) return;
+    const total = Database.getCartTotal();
     const orderData = {
       id: Date.now(),
       date: new Date().toLocaleDateString('fr-FR'),
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      items: [...cart],
+      items: cartItems,
       total: total,
       status: 'payé'
     };
     try {
-      Database.insertOrder(
-        JSON.stringify(orderData.items),
-        orderData.total,
-        orderData.date,
-        orderData.time
-      );
+      Database.insertOrder(JSON.stringify(orderData.items), orderData.total, orderData.date, orderData.time);
       setOrderHistory(Database.getOrders());
-      setCart([]);
+      Database.clearCart();
       setOrderSent(true);
-      try {
-        await printOrderViaBLE(orderData);
-      } catch (err) {
-        console.warn('Echec impression, mais commande sauvegardée:', err);
-      }
+      try { await printOrderViaBLE(orderData); } catch (err) { console.warn('Echec impression:', err); }
+      
+      // Correctif Success Screen : Redirection automatique après 3s
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
-      }, 4000);
+      }, 3000);
     } catch (sqlError) {
       console.error("Erreur critique SQL:", sqlError);
       Alert.alert("Erreur", "La commande n'a pas pu être enregistrée.");
     }
   };
 
-  /* ===================== EXPORT CSV ===================== */
-  const handleExportCSV = async () => {
-    await exportOrdersToCSV(orderHistory);
-  };
-
   const addToCart = () => {
     if (!currentItem) return;
-    const newItem = {
-      cartId: Date.now(),
-      ...currentItem,
-      quantity,
-      extras: { ...selectedExtras },
-      totalPrice
-    };
-    setCart([...cart, newItem]);
+    Database.addToCart(currentItem.id, currentItem.name, quantity, totalPrice, JSON.stringify(selectedExtras));
     setView('checkout');
   };
 
-  /* ===================== ADMIN PANEL ===================== */
-  const AdminPanel = ({
-    styles,
-    config,
-    setConfig,
-    menuItems,
-    setMenuItems,
-    sauces,
-    setSauces,
-    garnitures,
-    setGarnitures,
-    activeForm,
-    setActiveForm,
-    setView,
-    orderHistory,
-    handleExportCSV,
-    handleImageUpload
-  }) => {
-    const [formItem, setFormItem] = useState({
-      name: '',
-      price: '',
-      image: '',
-      type: 'plat'
-    });
-
-    const handleAddItem = () => {
-      if (!formItem.name) return;
-      try {
-        if (editingId) {
-          Database.updateProduct(editingId, formItem.name, parseInt(formItem.price) || 0, formItem.image);
-          setEditingId(null);
-        } else {
-          Database.saveProduct(formItem.name, parseInt(formItem.price) || 0, formItem.image, activeForm);
-        }
-        setMenuItems(Database.getProducts('plat'));
-        setSauces(Database.getProducts('sauce'));
-        setGarnitures(Database.getProducts('garniture'));
-        setActiveForm(null);
-        setFormItem({ name: '', price: '', image: '', type: 'plat' });
-      } catch (error) {
-        console.error("Erreur SQL:", error);
-      }
-    };
-
-    const handleDelete = (item) => {
-      Alert.alert("🗑️ SUPPRIMER", `Voulez-vous vraiment supprimer "${item.name}" ?`, [
-        { text: "ANNULER", style: "cancel" },
-        { text: "OUI", style: "destructive", onPress: () => {
-          try {
-            Database.deleteProduct(item.id);
-            setMenuItems(Database.getProducts('plat'));
-            setSauces(Database.getProducts('sauce'));
-            setGarnitures(Database.getProducts('garniture'));
-          } catch (error) {
-            console.error("Erreur suppression SQL:", error);
-          }
-        }}
-      ]);
-    };
-
+  if (splashVisible) {
     return (
-      <View style={styles.adminRoot}>
-        <ScrollView contentContainerStyle={styles.adminContainer}>
-          <View style={styles.adminHeader}>
-            <Text style={styles.adminTitle}>PANNEAU DE CONFIGURATION</Text>
-            <Pressable onPress={() => { setView('menu'); setActiveForm(null); }} style={styles.iconBtn}>
-              <IconX size={16} />
-            </Pressable>
-          </View>
-          {!activeForm && (
-            <View style={styles.adminMenu}>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('plat')}>
-                <Text style={styles.adminBtnText}>AJOUTER UN PLAT</Text>
-                <IconChevronRight size={14} />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('sauce')}>
-                <Text style={styles.adminBtnText}>AJOUTER UNE SAUCE</Text>
-                <IconChevronRight size={14} />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('garniture')}>
-                <Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text>
-                <IconChevronRight size={14} />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_plats')}>
-                <Text style={styles.adminBtnText}>LISTE DES PLATS</Text>
-                <IconChevronRight size={14} color="#f97316" />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_sauces')}>
-                <Text style={styles.adminBtnText}>LISTE DES SAUCES</Text>
-                <IconChevronRight size={14} color="#f97316" />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}>
-                <Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text>
-                <IconChevronRight size={14} color="#f97316" />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('logo')}>
-                <Text style={styles.adminBtnText}>LOGOS & QR</Text>
-                <IconChevronRight size={14} />
-              </Pressable>
-              <Pressable style={styles.adminBtn} onPress={() => setActiveForm('history')}>
-                <Text style={styles.adminBtnText}>HISTORIQUE DES VENTES</Text>
-                <IconChevronRight size={14} />
-              </Pressable>
-              <Pressable style={styles.exportBtn} onPress={handleExportCSV}>
-                <Text style={styles.exportText}>EXPORTER L’HISTORIQUE (CSV)</Text>
-              </Pressable>
-            </View>
-          )}
-          {activeForm && (
-            <View style={styles.adminFormWrapper}>
-              <Pressable style={styles.backBtn} onPress={() => setActiveForm(null)}>
-                <IconChevronLeft size={14} color="#777" />
-                <Text style={styles.backText}>RETOUR</Text>
-              </Pressable>
-              <View style={styles.formCard}>
-                {(activeForm === 'plat' || activeForm === 'sauce' || activeForm === 'garniture') && (
-                  <>
-                    <Text style={styles.formTitle}>NOUVEAU {activeForm.toUpperCase()}</Text>
-                    <Pressable style={styles.imagePicker} onPress={() => handleImageUpload((res) => setFormItem({ ...formItem, image: res, type: activeForm }))}>
-                      {formItem.image ? <Image source={{ uri: formItem.image }} style={styles.imagePreview} /> : <IconCamera />}
-                    </Pressable>
-                    <TextInput placeholder="Nom" placeholderTextColor="#777" style={styles.input} value={formItem.name} onChangeText={(t) => setFormItem({ ...formItem, name: t })} />
-                    {activeForm !== 'sauce' && (
-                      <TextInput placeholder="Prix (FCFA)" placeholderTextColor="#777" keyboardType="numeric" style={styles.input} value={formItem.price} onChangeText={(t) => setFormItem({ ...formItem, price: t })} />
-                    )}
-                    <Pressable style={styles.saveBtn} onPress={handleAddItem}>
-                      <Text style={styles.saveText}>ENREGISTRER</Text>
-                    </Pressable>
-                  </>
-                )}
-                {activeForm === 'logo' && (
-                  <View style={{ gap: 20 }}>
-                    <Text style={styles.formTitle}>LOGO PRINCIPAL</Text>
-                    <Pressable style={styles.logoPicker} onPress={() => handleImageUpload((res) => {
-                      Database.saveSetting('logoUrl', res);
-                      setConfig({ ...config, logoUrl: res });
-                    })}>
-                      {config.logoUrl ? <Image source={{ uri: config.logoUrl }} style={styles.logoPreview} /> : <IconCamera />}
-                    </Pressable>
-                    <Text style={styles.formTitle}>IMAGE QR CODE</Text>
-                    <Pressable style={styles.qrPicker} onPress={() => handleImageUpload((res) => {
-                      Database.saveSetting('qrCodeUrl', res);
-                      setConfig({ ...config, qrCodeUrl: res });
-                    })}>
-                      {config.qrCodeUrl ? <Image source={{ uri: config.qrCodeUrl }} style={styles.qrPreview} /> : <IconCamera />}
-                    </Pressable>
-                  </View>
-                )}
-                {activeForm === 'history' && (
-                  <ScrollView style={{ maxHeight: 400 }}>
-                    {orderHistory.length === 0 ? <Text style={styles.emptyHistory}>AUCUNE COMMANDE ENREGISTRÉE</Text> : 
-                      orderHistory.map(order => (
-                        <View key={order.id} style={[styles.historyCard, { borderLeftColor: DAILY_COLORS[parseInt(order.date.split('/')[0]) % 30] || '#f97316' }]}>
-                          <View style={styles.historyHeader}>
-                            <Text style={styles.historyDate}>{order.date} - {order.time}</Text>
-                            <Text style={styles.historyTotal}>{order.total} F</Text>
-                          </View>
-                          {JSON.parse(order.items).map((it, idx) => (
-                            <View key={idx} style={styles.historyItem}>
-                              <Text style={styles.historyItemText}>{it.quantity}x {it.name}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ))
-                    }
-                  </ScrollView>
-                )}
-                {(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
-                  <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
-                    {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
-                      <View key={item.id} style={styles.adminHorizontalCard}>
-                        <View style={styles.cardLeftContent}>
-                          <Image source={{ uri: item.image }} style={styles.cardSmallThumb} />
-                          <View>
-                            <Text style={styles.cardMainText}>{item.name}</Text>
-                            {activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}
-                          </View>
-                        </View>
-                        <View style={styles.cardActions}>
-                          <Pressable style={styles.actionEdit} onPress={() => {
-                            setEditingId(item.id);
-                            setFormItem({ name: item.name, price: item.price.toString(), image: item.image, type: activeForm.replace('list_', '').replace(/s$/, '') });
-                            setActiveForm(activeForm.replace('list_', '').replace(/s$/, ''));
-                          }}>
-                            <Text style={styles.actionBtnText}>MODIFIER</Text>
-                          </Pressable>
-                          <Pressable onPress={() => handleDelete(item)}><IconX size={20} color="#ef4444" /></Pressable>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            </View>
-          )}
-        </ScrollView>
+      <View style={styles.splashContainer}>
+        <Video
+          source={{ uri: 'file:///home/ubuntu/upload/1000117326.mp4' }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping={false}
+          onPlaybackStatusUpdate={(status) => {
+            if (status.didJustFinish) setSplashVisible(false);
+          }}
+        />
       </View>
     );
-  };
+  }
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root}>
       <View style={styles.tablet}>
         <Pressable style={styles.adminAccess} onPress={() => setShowPassModal(true)}>
           <IconChevronRight size={20} />
         </Pressable>
-        <View style={styles.content}>
-          <View style={styles.logoWrapper}>
-            {config.logoUrl && <Image source={{ uri: config.logoUrl }} style={styles.logo} />}
-          </View>
 
-          {currentItem ? (
-            <Text style={styles.price}>
-              {totalPrice} <Text style={styles.priceUnit}>FCFA</Text>
-            </Text>
+        {/* LOGO SANS FOND */}
+        <View style={styles.logoWrapper}>
+          {config.logoUrl ? (
+            <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
           ) : (
-            <Text style={styles.emptyText}>CONFIGUREZ VOTRE INTERFACE</Text>
-          )}
-
-          {menuItems.length > 0 && (
-            <View style={styles.carousel}>
-              <Pressable style={styles.navLeft} onPress={prevItem}>
-                <IconChevronLeft size={60} />
-              </Pressable>
-              <Pressable style={styles.navRight} onPress={nextItem}>
-                <IconChevronRight size={60} />
-              </Pressable>
-              {menuItems.map((item, idx) => {
-                let scale = 0, opacity = 0;
-                if (idx === activeIndex) { scale = 1.6; opacity = 1; }
-                else if (idx === (activeIndex - 1 + menuItems.length) % menuItems.length || idx === (activeIndex + 1) % menuItems.length) { scale = 0.4; opacity = 0.15; }
-                return (
-                  <View key={item.id} style={[styles.carouselItem, { transform: [{ scale }], opacity }]}>
-                    {item.image ? <Image source={{ uri: item.image }} style={styles.itemImage} /> : <View style={styles.imageFallback}><Text style={styles.imageFallbackText}>VISUEL</Text></View>}
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {currentItem && (
-            <View style={styles.quantityRow}>
-              <Pressable onPress={() => updateQuantity(-1)} style={styles.qtyBtn}><IconMinus /></Pressable>
-              <Text style={styles.itemName}>{currentItem.name}</Text>
-              <Pressable onPress={() => updateQuantity(1)} style={styles.qtyBtn}><IconPlus /></Pressable>
-            </View>
-          )}
-
-          {currentItem && (
-            <View style={styles.pickers}>
-              <Pressable style={styles.pickerBtn} onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}>
-                <Text style={styles.pickerText}>SAUCES ({selectedExtras.sauces.length})</Text>
-              </Pressable>
-              <Pressable style={styles.pickerBtnWide} onPress={() => { setShowGarniturePicker(!showGarniturePicker); setShowSaucePicker(false); }}>
-                <Text style={styles.pickerText}>GARNITURES</Text>
-                <IconPlus />
-              </Pressable>
-              <View style={styles.qtyBadge}><Text style={styles.qtyText}>{quantity}</Text></View>
-            </View>
-          )}
-
-          {(showSaucePicker || showGarniturePicker) && (
-            <View style={styles.extrasDropdown}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {(showSaucePicker ? sauces : garnitures).map((s) => (
-                  <Pressable key={s.id} onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)} style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}>
-                    {s.image ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} /> : <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>}
-                    <Text style={styles.extraItemText}>{s.name}</Text>
-                    {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-          
-          {currentItem && (
-            <Pressable style={styles.orderBtn} onPress={addToCart}>
-              <Text style={styles.orderText}>AJOUTER AU PANIER</Text>
-            </Pressable>
+            <Text style={styles.brandText}>NINJA <Text style={{color: '#f97316'}}>FRIES</Text></Text>
           )}
         </View>
 
-        <Modal visible={view === 'checkout'} animationType="slide" transparent>
-          <View style={styles.checkoutOverlay}>
-            <View style={styles.checkoutSheet}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.checkoutTitle}>VÉRIFIEZ VOTRE COMMANDE</Text>
-                <Pressable onPress={() => setView('menu')} style={styles.closeSheet}><IconX size={24} /></Pressable>
-              </View>
-              <ScrollView style={styles.checkoutList}>
-                {cart.map((item) => (
-                  <View key={item.cartId} style={styles.checkoutCard}>
-                    <View style={styles.cardInfo}>
-                      <Text style={styles.cardQty}>{item.quantity}x</Text>
-                      <View>
-                        <Text style={styles.cardName}>{item.name}</Text>
-                        <Text style={styles.cardExtras}>
-                          {[...item.extras.sauces.map(s => s.name), ...item.extras.garnitures.map(g => g.name)].join(' • ')}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.cardPrice}>{item.totalPrice} F</Text>
-                    <Pressable onPress={() => setCart(cart.filter(i => i.cartId !== item.cartId))} style={styles.removeItem}><IconX size={14} /></Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-              <View style={styles.qrSection}>
-                <View style={styles.qrContainer}>
-                  {config.qrCodeUrl ? <Image source={{ uri: config.qrCodeUrl }} style={styles.qrImage} /> : <View style={styles.qrPlaceholder}><Text>QR CODE</Text></View>}
+        {/* PRIX DYNAMIQUE */}
+        <View style={styles.priceContainer}>
+          <Text style={styles.price}>
+            {currentItem ? totalPrice : 0}
+            <Text style={styles.priceUnit}> FCFA</Text>
+          </Text>
+        </View>
+
+        {/* CAROUSEL AVEC SWIPE ET ANIMATIONS */}
+        <View style={styles.carouselContainer}>
+          <Animated.ScrollView
+            horizontal
+            pagingEnabled
+            snapToInterval={SCREEN_WIDTH * 0.8}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={{ paddingHorizontal: SCREEN_WIDTH * 0.1 }}
+          >
+            {menuItems.map((item, index) => {
+              const scale = scrollX.interpolate({
+                inputRange: [(index - 1) * (SCREEN_WIDTH * 0.8), index * (SCREEN_WIDTH * 0.8), (index + 1) * (SCREEN_WIDTH * 0.8)],
+                outputRange: [0.8, 1.1, 0.8],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollX.interpolate({
+                inputRange: [(index - 1) * (SCREEN_WIDTH * 0.8), index * (SCREEN_WIDTH * 0.8), (index + 1) * (SCREEN_WIDTH * 0.8)],
+                outputRange: [0.5, 1, 0.5],
+                extrapolate: 'clamp',
+              });
+              return (
+                <View key={item.id} style={styles.swipeItem}>
+                  <Animated.Image
+                    source={{ uri: item.image }}
+                    style={[styles.itemImage, { transform: [{ scale }], opacity }]}
+                    resizeMode="contain"
+                  />
                 </View>
-                <Text style={styles.totalCheckoutValue}>{cart.reduce((s, i) => s + i.totalPrice, 0)} FCFA</Text>
-              </View>
-              <Pressable style={[styles.confirmOrderBtn, cart.length === 0 && { opacity: 0.5 }]} onPress={validateOrder} disabled={cart.length === 0}>
-                <Text style={styles.confirmOrderText}>VALIDER LA COMMANDE</Text>
-              </Pressable>
-            </View>
+              );
+            })}
+          </Animated.ScrollView>
+        </View>
+
+        {/* NOM DU PLAT ET QUANTITÉ */}
+        <View style={styles.infoSection}>
+          <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
+          <View style={styles.quantityRow}>
+            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(-1)}>
+              <Text style={styles.qtyBtnText}>-</Text>
+            </Pressable>
+            <Text style={styles.qtyBadgeText}>{quantity}</Text>
+            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(1)}>
+              <Text style={styles.qtyBtnText}>+</Text>
+            </Pressable>
           </View>
+        </View>
+
+        {/* INDICATEURS DE SLIDE */}
+        <View style={styles.pagination}>
+          {menuItems.map((_, i) => (
+            <View key={i} style={[styles.dot, { width: currentIndex === i ? 24 : 8, backgroundColor: currentIndex === i ? '#f97316' : '#27272a' }]} />
+          ))}
+        </View>
+
+        {/* SÉLECTEURS DE SAUCES ET GARNITURES */}
+        {currentItem && (
+          <View style={styles.pickers}>
+            <Pressable style={styles.pickerBtn} onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}>
+              <Text style={styles.pickerText}>SAUCES ({selectedExtras.sauces.length})</Text>
+            </Pressable>
+            <Pressable style={styles.pickerBtnWide} onPress={() => { setShowGarniturePicker(!showGarniturePicker); setShowSaucePicker(false); }}>
+              <Text style={styles.pickerText}>GARNITURES</Text>
+              <IconPlus />
+            </Pressable>
+          </View>
+        )}
+
+        {(showSaucePicker || showGarniturePicker) && (
+          <View style={styles.extrasDropdown}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {(showSaucePicker ? sauces : garnitures).map((s) => (
+                <Pressable key={s.id} onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)} style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}>
+                  {s.image ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" /> : <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>}
+                  <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
+                  {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* BOUTON COMMANDER */}
+        <Pressable style={styles.orderBtn} onPress={addToCart}>
+          <Text style={styles.orderText}>COMMANDER</Text>
+        </Pressable>
+
+        {/* MODALS */}
+        <Modal visible={view === 'checkout'} animationType="slide" transparent>
+          <CheckoutScreen config={config} onConfirm={validateOrder} onClose={() => setView('menu')} onRemoveItem={() => {}} />
         </Modal>
 
         {orderSent && (
-          <View style={styles.successScreen}>
+          <Pressable style={styles.successScreen} onPress={() => { setOrderSent(false); setView('menu'); }}>
             <View style={styles.successIconContainer}><IconCheck /></View>
             <Text style={styles.successTitle}>COMMANDE ENVOYÉE</Text>
             <Text style={styles.successSubtitle}>VEUILLEZ RETIRER VOTRE TICKET</Text>
-          </View>
+          </Pressable>
         )}
 
         <Modal visible={showPassModal} transparent>
@@ -696,88 +543,189 @@ export default function App() {
           </View></View>
         </Modal>
 
-        {view === 'settings' && <AdminPanel styles={styles} config={config} setConfig={setConfig} menuItems={menuItems} setMenuItems={setMenuItems} sauces={sauces} setSauces={setSauces} garnitures={garnitures} setGarnitures={setGarnitures} activeForm={activeForm} setActiveForm={setActiveForm} setView={setView} orderHistory={orderHistory} handleExportCSV={handleExportCSV} handleImageUpload={handleImageUpload} />}
+        {view === 'settings' && (
+          <AdminPanel 
+            styles={styles} config={config} setConfig={setConfig} 
+            menuItems={menuItems} setMenuItems={setMenuItems} 
+            sauces={sauces} setSauces={setSauces} 
+            garnitures={garnitures} setGarnitures={setGarnitures} 
+            activeForm={activeForm} setActiveForm={setActiveForm} 
+            setView={setView} orderHistory={orderHistory} 
+            handleExportCSV={exportOrdersToCSV} handleImageUpload={handleImageUpload} 
+          />
+        )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  root:{ flex:1, backgroundColor:'#000', alignItems:'center', justifyContent:'center' },
-  tablet:{ width:390, height:780, backgroundColor:'#09090b', borderRadius:48, overflow:'hidden' },
-  adminAccess:{ position:'absolute', top:30, left:20, zIndex:50 },
-  content:{ flex:1, padding:20, justifyContent:'space-between' },
-  logoWrapper:{ alignItems:'center', marginTop:10, backgroundColor: 'transparent' },
-  logo:{ width:80, height:80, resizeMode:'contain' },
-  price: { textAlign: 'center', fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 12, marginVertical: 10 },
-  priceUnit: { fontSize: 22, color: '#f97316', fontWeight: '900', marginLeft: 5 },
-  emptyText:{ textAlign:'center', color:'#444', fontWeight:'900', fontStyle: 'italic' },
-  carousel: { height: 260, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
-  carouselItem: { position: 'absolute', backgroundColor: 'transparent', overflow: 'visible' },
-  itemImage: { width: 180, height: 180, resizeMode: 'contain', shadowColor: "#f97316", shadowOffset: { width: 0, height: 15 }, shadowOpacity: 0.5, shadowRadius: 30, elevation: 15 },
-  imageFallback: { width: 160, height: 160, borderRadius: 80, backgroundColor: 'transparent', justifyContent: 'center', borderWidth: 1, borderColor: '#27272a' },
-  imageFallbackText:{ textAlign:'center', color:'#555', fontWeight:'900' },
-  navLeft:{ position:'absolute', left:-20, zIndex: 10 },
-  navRight:{ position:'absolute', right:-20, zIndex: 10 },
-  quantityRow:{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:20, marginVertical: 10 },
-  qtyBtn: { padding: 10 },
-  itemName:{ color:'#f97316', fontWeight:'900', fontSize: 34, textAlign:'center', maxWidth:250, fontStyle: 'italic' },
-  pickers:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop: 10 },
-  pickerBtn: { 
-  flex: 1, 
-  height: 45,               // Force la hauteur
-  borderWidth: 1, 
-  borderColor: '#fff', 
-  paddingHorizontal: 15,    // Padding sur les côtés uniquement
-  borderRadius: 30,
-  justifyContent: 'center', // Centre le texte verticalement
-  alignItems: 'center'      // Centre le texte horizontalement (si pas de flèche)
-},
+const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces, setSauces, garnitures, setGarnitures, activeForm, setActiveForm, setView, orderHistory, handleExportCSV, handleImageUpload }) => {
+  const [formItem, setFormItem] = useState({ name: '', price: '', image: '', type: 'plat' });
+  const [editingId, setEditingId] = useState(null);
 
-pickerBtnWide: { 
-  flex: 1.2, 
-  height: 45,               // Même hauteur que l'autre
-  flexDirection: 'row', 
-  alignItems: 'center', 
-  justifyContent: 'space-between', 
-  borderWidth: 1, 
-  borderColor: '#fff', 
-  paddingHorizontal: 15,    // Même padding
-  borderRadius: 30, 
-  marginLeft: 10 
-},
-  pickerText:{ color:'#fff', fontWeight:'900', fontSize:12, fontStyle: 'italic' },
-  extrasDropdown: { marginTop: 15 },
+  const handleAddItem = () => {
+    if (!formItem.name) return;
+    try {
+      if (editingId) {
+        Database.updateProduct(editingId, formItem.name, parseInt(formItem.price) || 0, formItem.image);
+        setEditingId(null);
+      } else {
+        Database.saveProduct(formItem.name, parseInt(formItem.price) || 0, formItem.image, activeForm);
+      }
+      setMenuItems(Database.getProducts('plat'));
+      setSauces(Database.getProducts('sauce'));
+      setGarnitures(Database.getProducts('garniture'));
+      setActiveForm(null);
+      setFormItem({ name: '', price: '', image: '', type: 'plat' });
+    } catch (error) { console.error("Erreur SQL:", error); }
+  };
+
+  return (
+    <View style={styles.adminRoot}>
+      <ScrollView contentContainerStyle={styles.adminContainer}>
+        <View style={styles.adminHeader}>
+          <Text style={styles.adminTitle}>PANNEAU DE CONFIGURATION</Text>
+          <Pressable onPress={() => { setView('menu'); setActiveForm(null); }} style={styles.iconBtn}><IconX size={16} /></Pressable>
+        </View>
+        {!activeForm && (
+          <View style={styles.adminMenu}>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('plat')}><Text style={styles.adminBtnText}>AJOUTER UN PLAT</Text><IconChevronRight size={14} /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('sauce')}><Text style={styles.adminBtnText}>AJOUTER UNE SAUCE</Text><IconChevronRight size={14} /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('garniture')}><Text style={styles.adminBtnText}>AJOUTER UNE GARNITURE</Text><IconChevronRight size={14} /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_plats')}><Text style={styles.adminBtnText}>LISTE DES PLATS</Text><IconChevronRight size={14} color="#f97316" /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_sauces')}><Text style={styles.adminBtnText}>LISTE DES SAUCES</Text><IconChevronRight size={14} color="#f97316" /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}><Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text><IconChevronRight size={14} color="#f97316" /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('logo')}><Text style={styles.adminBtnText}>LOGOS & QR</Text><IconChevronRight size={14} /></Pressable>
+            <Pressable style={styles.adminBtn} onPress={() => setActiveForm('history')}><Text style={styles.adminBtnText}>HISTORIQUE DES VENTES</Text><IconChevronRight size={14} /></Pressable>
+            <Pressable style={styles.exportBtn} onPress={() => handleExportCSV(orderHistory)}><Text style={styles.exportText}>EXPORTER L’HISTORIQUE (CSV)</Text></Pressable>
+          </View>
+        )}
+        {activeForm && (
+          <View style={styles.adminFormWrapper}>
+            <Pressable style={styles.backBtn} onPress={() => setActiveForm(null)}><IconChevronLeft size={14} color="#777" /><Text style={styles.backText}>RETOUR</Text></Pressable>
+            <View style={styles.formCard}>
+              {(activeForm === 'plat' || activeForm === 'sauce' || activeForm === 'garniture') && (
+                <>
+                  <Text style={styles.formTitle}>NOUVEAU {activeForm.toUpperCase()}</Text>
+                  <Pressable style={styles.imagePicker} onPress={() => handleImageUpload((res) => setFormItem({ ...formItem, image: res, type: activeForm }))}>
+                    {formItem.image ? <Image source={{ uri: formItem.image }} style={styles.imagePreview} /> : <IconCamera />}
+                  </Pressable>
+                  <TextInput placeholder="Nom" placeholderTextColor="#777" style={styles.input} value={formItem.name} onChangeText={(t) => setFormItem({ ...formItem, name: t })} />
+                  {activeForm !== 'sauce' && <TextInput placeholder="Prix (FCFA)" placeholderTextColor="#777" keyboardType="numeric" style={styles.input} value={formItem.price} onChangeText={(t) => setFormItem({ ...formItem, price: t })} />}
+                  <Pressable style={styles.saveBtn} onPress={handleAddItem}><Text style={styles.saveText}>ENREGISTRER</Text></Pressable>
+                </>
+              )}
+              {activeForm === 'logo' && (
+                <View style={{ gap: 20 }}>
+                  <Text style={styles.formTitle}>LOGO PRINCIPAL</Text>
+                  <Pressable style={styles.logoPicker} onPress={() => handleImageUpload((res) => { Database.saveSetting('logoUrl', res); setConfig(prev => ({ ...prev, logoUrl: res })); })}>
+                    {config.logoUrl ? <Image source={{ uri: config.logoUrl }} style={styles.logoPreview} /> : <IconCamera />}
+                  </Pressable>
+                  <Text style={styles.formTitle}>IMAGE QR CODE</Text>
+                  <Pressable style={styles.qrPicker} onPress={() => handleImageUpload((res) => { Database.saveSetting('qrCodeUrl', res); setConfig(prev => ({ ...prev, qrCodeUrl: res })); })}>
+                    {config.qrCodeUrl ? <Image source={{ uri: config.qrCodeUrl }} style={styles.qrPreview} /> : <IconCamera />}
+                  </Pressable>
+                </View>
+              )}
+              {activeForm === 'history' && (
+                <ScrollView style={{ maxHeight: 400 }}>
+                  {orderHistory.length === 0 ? <Text style={styles.emptyHistory}>AUCUNE COMMANDE ENREGISTRÉE</Text> : 
+                    orderHistory.map(order => (
+                      <View key={order.id} style={[styles.historyCard, { borderLeftColor: DAILY_COLORS[parseInt(order.date.split('/')[0]) % 30] || '#f97316' }]}>
+                        <View style={styles.historyHeader}>
+                          <Text style={styles.historyDate}>{order.date} - {order.time}</Text>
+                          <Text style={styles.historyTotal}>{order.total} F</Text>
+                        </View>
+                        {JSON.parse(order.items).map((it, idx) => <View key={idx} style={styles.historyItem}><Text style={styles.historyItemText}>{it.quantity}x {it.name}</Text></View>)}
+                      </View>
+                    ))
+                  }
+                </ScrollView>
+              )}
+              {(activeForm === 'list_plats' || activeForm === 'list_sauces' || activeForm === 'list_garnitures') && (
+                <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
+                  {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
+                    <View key={item.id} style={styles.adminHorizontalCard}>
+                      <View style={styles.cardLeftContent}><Image source={{ uri: item.image }} style={styles.cardSmallThumb} /><View><Text style={styles.cardMainText}>{item.name}</Text>{activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}</View></View>
+                      <View style={styles.cardActions}>
+                        <Pressable style={styles.actionEdit} onPress={() => { setEditingId(item.id); setFormItem({ name: item.name, price: item.price.toString(), image: item.image, type: activeForm.replace('list_', '').replace(/s$/, '') }); setActiveForm(activeForm.replace('list_', '').replace(/s$/, '')); }}><Text style={styles.actionBtnText}>MODIFIER</Text></Pressable>
+                        <Pressable onPress={() => { Database.deleteProduct(item.id); setMenuItems(Database.getProducts('plat')); setSauces(Database.getProducts('sauce')); setGarnitures(Database.getProducts('garniture')); }}><IconX size={20} color="#ef4444" /></Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  splashContainer: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  tablet: { width: 390, height: 780, backgroundColor: '#09090b', borderRadius: 48, overflow: 'hidden', paddingVertical: 20 },
+  adminAccess: { position: 'absolute', top: 30, left: 20, zIndex: 50 },
+  logoWrapper: { alignItems: 'center', marginBottom: 10, backgroundColor: 'transparent' },
+  logo: { width: 120, height: 60 },
+  brandText: { color: '#FFF', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
+  priceContainer: { alignItems: 'center', height: 80 },
+  price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic' },
+  priceUnit: { fontSize: 22 },
+  carouselContainer: { height: 280, justifyContent: 'center', overflow: 'visible' },
+  swipeItem: { width: SCREEN_WIDTH * 0.8, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  itemImage: { width: 220, height: 220, shadowColor: "#f97316", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 30, backgroundColor: 'transparent' },
+  infoSection: { alignItems: 'center', marginTop: 10 },
+  itemNameText: { color: '#f97316', fontWeight: '900', fontSize: 34, fontStyle: 'italic', textAlign: 'center' },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 15 },
+  qtyBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#18181b', borderWidth: 1, borderColor: '#27272a', alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: '#f97316', fontSize: 24, fontWeight: 'bold' },
+  qtyBadgeText: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  pagination: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 20 },
+  dot: { height: 8, borderRadius: 4 },
+  pickers: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 30 },
+  pickerBtn: { flex: 1, height: 45, borderWidth: 1, borderColor: '#fff', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  pickerBtnWide: { flex: 1.2, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#fff', paddingHorizontal: 15, borderRadius: 30, marginLeft: 10 },
+  pickerText: { color: '#fff', fontWeight: '900', fontSize: 12, fontStyle: 'italic' },
+  extrasDropdown: { marginTop: 15, paddingHorizontal: 20 },
   extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 100, overflow: 'visible' },
   extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
   extraItemText: { color: '#fff', fontSize: 11, textAlign: 'center', fontWeight: '900', marginTop: 5 },
-  extraImageSmall: { width: 60, height: 60, resizeMode: 'contain', shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  extraImageSmall: { width: 60, height: 60, shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, backgroundColor: 'transparent' },
   extraImageFallback: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
   extraPriceText: { color: '#f97316', fontSize: 10, fontWeight: '900' },
-  checkoutOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'flex-end' },
-  checkoutSheet: { backgroundColor: '#18181b', borderTopLeftRadius: 40, borderTopRightRadius: 40, height: '90%', padding: 30 },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  checkoutTitle: { color: '#f97316', fontSize: 24, fontWeight: '900', fontStyle: 'italic', flex: 1, textAlign: 'center' },
-  closeSheet: { backgroundColor: '#27272a', padding: 10, borderRadius: 25 },
-  checkoutList: { flex: 1 },
-  checkoutCard: { backgroundColor: 'transparent', borderBottomWidth: 1, borderColor: '#27272a', paddingVertical: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardInfo: { flexDirection: 'row', alignItems: 'center', gap: 15, flex: 1 },
-  cardQty: { color: '#f97316', fontWeight: '900', fontSize: 20 },
-  cardName: { color: '#fff', fontWeight: '900', fontSize: 18 },
-  cardExtras: { color: '#f97316', fontSize: 12, marginTop: 4, fontWeight: '700' },
-  cardPrice: { color: '#fff', fontWeight: '900', fontSize: 18 },
-  removeItem: { padding: 10 },
-  qrSection: { alignItems: 'center', marginVertical: 20 },
-  qrContainer: { backgroundColor: '#fff', padding: 15, borderRadius: 25, width: 180, height: 180, justifyContent: 'center', alignItems: 'center' },
-  qrImage: { width: 150, height: 150, resizeMode: 'contain' },
-  qrPlaceholder: { color: '#000', fontWeight: '900' },
-  totalCheckoutValue: { color: '#f97316', fontSize: 36, fontWeight: '900', marginTop: 15, fontStyle: 'italic' },
-  confirmOrderBtn: { backgroundColor: '#f97316', padding: 22, borderRadius: 30, alignItems: 'center', marginTop: 10 },
-  confirmOrderText: { color: '#fff', fontWeight: '900', fontSize: 18, letterSpacing: 1 },
-  qtyBadge:{ width:36, height:36, borderRadius:18, backgroundColor:'#18181b', justifyContent:'center', marginLeft: 10, borderWidth: 1, borderColor: '#27272a' },
-  qtyText:{ color:'#f97316', textAlign:'center', fontWeight:'900', fontSize: 16 },
-  orderBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:35, marginTop: 20 },
-  orderText:{ textAlign:'center', fontWeight:'900', letterSpacing:2, color: '#fff', fontSize: 16, fontStyle: 'italic' },
+  orderBtn: { backgroundColor: '#f97316', padding: 20, borderRadius: 30, marginHorizontal: 40, marginTop: 20, alignItems: 'center' },
+  orderText: { color: '#fff', fontWeight: '900', fontSize: 18, letterSpacing: 1, fontStyle: 'italic' },
+  overlay: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1 },
+  closeButton: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 25, marginRight: 20, marginTop: 10 },
+  scrollContent: { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 40 },
+  headerSection: { width: '100%', marginVertical: 30, alignItems: 'center' },
+  checkoutTitleText: { color: '#f97316', fontSize: 22, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },
+  headerSeparator: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', width: '100%', marginTop: 15 },
+  itemsList: { width: '100%', marginBottom: 25 },
+  itemRow: { marginBottom: 15, width: '100%' },
+  itemMainLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, marginRight: 15 },
+  itemNameContainer: { flexDirection: 'row' },
+  orangeText: { color: '#f97316', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+  whiteText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+  itemPrice: { color: '#f97316', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+  removeRowButton: { backgroundColor: 'rgba(255, 255, 255, 0.15)', padding: 8, borderRadius: 20 },
+  extrasContainer: { marginTop: 6, paddingLeft: 10 },
+  extraDetailText: { color: '#FFFFFF', fontSize: 13, fontStyle: 'italic' },
+  orangeExtraValue: { color: '#f97316' },
+  separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: 12 },
+  whiteCard: { backgroundColor: '#FFFFFF', width: SCREEN_WIDTH * 0.85, borderRadius: 35, padding: 25, alignItems: 'center', marginBottom: 30 },
+  qrWrapper: { width: 140, height: 140, backgroundColor: '#f0f0f0', borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 18 },
+  qrImage: { width: '100%', height: '100%' },
+  totalSection: { alignItems: 'center' },
+  totalLabel: { color: '#888888', fontSize: 13, fontWeight: '700' },
+  totalValue: { color: '#f97316', fontSize: 32, fontWeight: '900', fontStyle: 'italic' },
+  confirmButton: { backgroundColor: '#f97316', width: '100%', padding: 20, borderRadius: 50, alignItems: 'center' },
+  confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1.5 },
   successScreen: { ...StyleSheet.absoluteFillObject, backgroundColor: '#f97316', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   successIconContainer: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   successTitle: { fontSize: 32, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
@@ -826,8 +774,5 @@ pickerBtnWide: {
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   actionEdit: { backgroundColor: '#27272a', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f6' },
   actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
-  // À ajouter à la fin de ton bloc StyleSheet.create({ ... })
-  cancelText: { color: '#ffffff', fontWeight: '900', fontStyle: 'italic' },
-  confirmText: { color: '#ffffff', fontWeight: '900', fontStyle: 'italic' },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
 });
