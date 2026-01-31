@@ -20,7 +20,10 @@
     "expo-sharing": "~12.0.1",
     "buffer": "^6.0.3",
     "expo-modules-core": "~1.12.21",
-    "expo-sqlite": "~14.0.3"
+    "expo-sqlite": "~14.0.3",
+    "expo-av": "~14.0.5",
+    "expo-blur": "~13.0.2",
+    "lucide-react-native": "^0.473.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
