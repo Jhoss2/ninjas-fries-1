@@ -182,10 +182,14 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
   }, []);
 
   const refreshCart = () => {
-    const items = Database.getCartItems();
-    const total = Database.getCartTotal();
-    setCartItems(items);
-    setTotalAmount(total);
+    try {
+      const items = Database.getCartItems();
+      const total = Database.getCartTotal();
+      setCartItems(items || []);
+      setTotalAmount(total || 0);
+    } catch (e) {
+      console.error("Erreur refreshCart SQL:", e);
+    }
   };
 
   const handleRemove = (id) => {
@@ -270,7 +274,6 @@ export default function App() {
   const { width } = useWindowDimensions();
   const [splashVisible, setSplashVisible] = useState(true);
   const [view, setView] = useState('menu');
-  const [appColor, setAppColor] = useState('#6200ee'); 
   const [config, setConfig] = useState({ logoUrl: '', qrCodeUrl: '' });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -285,22 +288,32 @@ export default function App() {
   const [selectedExtras, setSelectedExtras] = useState({ sauces: [], garnitures: [] });
   const [orderHistory, setOrderHistory] = useState([]);
   const [activeForm, setActiveForm] = useState(null);
-  const [editingId, setEditingId] = useState(null);
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
+  // 1. SÉCURITÉ SPLASH SCREEN : Timeout de secours
+  useEffect(() => {
+    const splashTimeout = setTimeout(() => {
+      if (splashVisible) {
+        console.log("Fallback: Forcer la fin du Splash Screen");
+        setSplashVisible(false);
+      }
+    }, 6000); // 6 secondes max pour la vidéo
+    return () => clearTimeout(splashTimeout);
+  }, [splashVisible]);
+
+  // 2. INITIALISATION SQLITE SÉCURISÉE
   useEffect(() => {
     const initApp = async () => {
       try {
         Database.init();
-        setAppColor(Database.getDailyColor());
         const savedLogo = Database.getSetting('logoUrl');
         const savedQr = Database.getSetting('qrCodeUrl');
         setConfig({ logoUrl: savedLogo || '', qrCodeUrl: savedQr || '' });
-        setMenuItems(Database.getProducts('plat'));
-        setSauces(Database.getProducts('sauce'));
-        setGarnitures(Database.getProducts('garniture'));
-        setOrderHistory(Database.getSales());
+        setMenuItems(Database.getProducts('plat') || []);
+        setSauces(Database.getProducts('sauce') || []);
+        setGarnitures(Database.getProducts('garniture') || []);
+        setOrderHistory(Database.getSales() || []);
       } catch (e) {
         console.error("Erreur d'initialisation SQL :", e);
       }
@@ -373,7 +386,7 @@ export default function App() {
       setOrderSent(true);
       try { await printOrderViaBLE(orderData); } catch (err) { console.warn('Echec impression:', err); }
       
-      // Correctif Success Screen : Redirection automatique après 3s
+      // REDIRECTION AUTOMATIQUE SUCCESS SCREEN (3s)
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
@@ -390,17 +403,24 @@ export default function App() {
     setView('checkout');
   };
 
+  // RENDU DU SPLASH SCREEN
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
         <Video
-          source={{ uri: 'file:///home/ubuntu/upload/1000117326.mp4' }}
+          source={require('./assets/1000117326.mp4')} // Utilisation de require pour assets Expo
           style={StyleSheet.absoluteFill}
           resizeMode={ResizeMode.COVER}
           shouldPlay
           isLooping={false}
           onPlaybackStatusUpdate={(status) => {
-            if (status.didJustFinish) setSplashVisible(false);
+            if (status.didJustFinish) {
+              setSplashVisible(false);
+            }
+          }}
+          onError={(e) => {
+            console.error("Erreur lecture vidéo:", e);
+            setSplashVisible(false);
           }}
         />
       </View>
@@ -572,9 +592,9 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
       } else {
         Database.saveProduct(formItem.name, parseInt(formItem.price) || 0, formItem.image, activeForm);
       }
-      setMenuItems(Database.getProducts('plat'));
-      setSauces(Database.getProducts('sauce'));
-      setGarnitures(Database.getProducts('garniture'));
+      setMenuItems(Database.getProducts('plat') || []);
+      setSauces(Database.getProducts('sauce') || []);
+      setGarnitures(Database.getProducts('garniture') || []);
       setActiveForm(null);
       setFormItem({ name: '', price: '', image: '', type: 'plat' });
     } catch (error) { console.error("Erreur SQL:", error); }
@@ -649,7 +669,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
                       <View style={styles.cardLeftContent}><Image source={{ uri: item.image }} style={styles.cardSmallThumb} /><View><Text style={styles.cardMainText}>{item.name}</Text>{activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}</View></View>
                       <View style={styles.cardActions}>
                         <Pressable style={styles.actionEdit} onPress={() => { setEditingId(item.id); setFormItem({ name: item.name, price: item.price.toString(), image: item.image, type: activeForm.replace('list_', '').replace(/s$/, '') }); setActiveForm(activeForm.replace('list_', '').replace(/s$/, '')); }}><Text style={styles.actionBtnText}>MODIFIER</Text></Pressable>
-                        <Pressable onPress={() => { Database.deleteProduct(item.id); setMenuItems(Database.getProducts('plat')); setSauces(Database.getProducts('sauce')); setGarnitures(Database.getProducts('garniture')); }}><IconX size={20} color="#ef4444" /></Pressable>
+                        <Pressable onPress={() => { Database.deleteProduct(item.id); setMenuItems(Database.getProducts('plat') || []); setSauces(Database.getProducts('sauce') || []); setGarnitures(Database.getProducts('garniture') || []); }}><IconX size={20} color="#ef4444" /></Pressable>
                       </View>
                     </View>
                   ))}
