@@ -36,7 +36,9 @@
           "bluetoothAlwaysPermissionDescription": "L'application a besoin du Bluetooth pour imprimer les tickets."
         }
       ],
-      "expo-av"
+      "expo-av",
+      "expo-sqlite",
+      "expo-blur"
     ]
   }
 }
