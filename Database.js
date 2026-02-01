@@ -1,17 +1,26 @@
 import * as SQLite from 'expo-sqlite';
 
 /**
- * Ouverture de la base de données de manière synchrone.
- * Note : 'import' doit être en minuscule.
+ * Correction pour Codemagic & Prebuild :
+ * On n'ouvre pas la connexion immédiatement au chargement du script.
+ * On utilise une fonction pour récupérer l'instance uniquement à l'exécution.
  */
-const db = SQLite.openDatabaseSync('ninjas_fries.db');
+let _db = null;
 
-const Database = {
+const getDb = () => {
+  if (!_db) {
+    _db = SQLite.openDatabaseSync('ninjas_fries.db');
+  }
+  return _db;
+};
+
+export const Database = {
   /**
    * Initialise les tables de la base de données si elles n'existent pas.
    */
   init: () => {
     try {
+      const db = getDb();
       db.execSync(`
         CREATE TABLE IF NOT EXISTS products (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +50,7 @@ const Database = {
         );
       `);
     } catch (error) {
-      console.error("Erreur lors de l'initialisation de la base :", error);
+      console.error("Init Error:", error);
     }
   },
 
@@ -49,8 +58,9 @@ const Database = {
    * Gestion de la couleur du jour.
    */
   getDailyColor: () => {
-    const today = new Date().toLocaleDateString('fr-FR');
     try {
+      const db = getDb();
+      const today = new Date().toLocaleDateString('fr-FR');
       const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [`color_${today}`]);
       
       if (result) {
@@ -68,59 +78,49 @@ const Database = {
         return randomColor;
       }
     } catch (e) {
-      return '#f97316'; // Repli sur la couleur orange ninja par défaut
+      return '#f97316';
     }
   },
 
-  /**
-   * Gestion des paramètres (settings).
-   */
   getSetting: (key) => {
     try {
-      const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [key]);
-      return result ? result.value : null;
+      return getDb().getFirstSync('SELECT value FROM settings WHERE key = ?', [key])?.value;
     } catch (e) { return null; }
   },
 
   saveSetting: (key, value) => {
     try {
-      db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
+      getDb().runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
     } catch (e) {}
   },
 
-  /**
-   * Gestion des produits.
-   */
   getProducts: (type) => {
     try {
-      return db.getAllSync('SELECT * FROM products WHERE type = ?', [type]);
+      return getDb().getAllSync('SELECT * FROM products WHERE type = ?', [type]);
     } catch (e) { return []; }
   },
 
   saveProduct: (name, price, image, type) => {
     try {
-      db.runSync('INSERT INTO products (name, price, image, type) VALUES (?, ?, ?, ?)', [name, price, image, type]);
+      getDb().runSync('INSERT INTO products (name, price, image, type) VALUES (?, ?, ?, ?)', [name, price, image, type]);
     } catch (e) {}
   },
 
   updateProduct: (id, name, price, image) => {
     try {
-      db.runSync('UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?', [name, price, image, id]);
+      getDb().runSync('UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?', [name, price, image, id]);
     } catch (e) {}
   },
 
   deleteProduct: (id) => {
     try {
-      db.runSync('DELETE FROM products WHERE id = ?', [id]);
+      getDb().runSync('DELETE FROM products WHERE id = ?', [id]);
     } catch (e) {}
   },
 
-  /**
-   * Gestion du PANIER (cart_table).
-   */
   addToCart: (productId, name, quantity, totalPrice, extrasJson) => {
     try {
-      db.runSync(
+      getDb().runSync(
         'INSERT INTO cart_table (productId, name, quantity, totalPrice, extras) VALUES (?, ?, ?, ?, ?)',
         [productId, name, quantity, totalPrice, extrasJson]
       );
@@ -129,50 +129,44 @@ const Database = {
 
   getCartItems: () => {
     try {
-      return db.getAllSync('SELECT * FROM cart_table');
+      return getDb().getAllSync('SELECT * FROM cart_table');
     } catch (e) { return []; }
   },
 
   getCartTotal: () => {
     try {
-      const result = db.getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
-      return result ? (result.grandTotal || 0) : 0;
+      const result = getDb().getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
+      return result ? result.grandTotal || 0 : 0;
     } catch (e) { return 0; }
   },
 
   removeFromCart: (id) => {
     try {
-      db.runSync('DELETE FROM cart_table WHERE id = ?', [id]);
+      getDb().runSync('DELETE FROM cart_table WHERE id = ?', [id]);
     } catch (e) {}
   },
 
   clearCart: () => {
     try {
-      db.runSync('DELETE FROM cart_table');
+      getDb().runSync('DELETE FROM cart_table');
     } catch (e) {}
   },
 
-  /**
-   * Gestion des commandes (orders).
-   */
   getOrders: () => {
     try {
-      return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
+      return getDb().getAllSync('SELECT * FROM orders ORDER BY id DESC');
     } catch (e) { return []; }
   },
 
   getSales: () => {
     try {
-      return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
+      return getDb().getAllSync('SELECT * FROM orders ORDER BY id DESC');
     } catch (e) { return []; }
   },
 
   insertOrder: (itemsJson, total, date, time) => {
     try {
-      db.runSync('INSERT INTO orders (items, total, date, time) VALUES (?, ?, ?, ?)', [itemsJson, total, date, time]);
+      getDb().runSync('INSERT INTO orders (items, total, date, time) VALUES (?, ?, ?, ?)', [itemsJson, total, date, time]);
     } catch (e) {}
   }
 };
-
-// Exportation nommée
-export { Database };
