@@ -7,34 +7,38 @@ export const Database = {
    * Initialise les tables de la base de données si elles n'existent pas.
    */
   init: () => {
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        price INTEGER NOT NULL,
-        image TEXT,
-        type TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-      CREATE TABLE IF NOT EXISTS orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        time TEXT NOT NULL,
-        items TEXT NOT NULL,
-        total INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS cart_table (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        productId INTEGER,
-        name TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
-        totalPrice INTEGER NOT NULL,
-        extras TEXT
-      );
-    `);
+    try {
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS products (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          price INTEGER NOT NULL,
+          image TEXT,
+          type TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT
+        );
+        CREATE TABLE IF NOT EXISTS orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          time TEXT NOT NULL,
+          items TEXT NOT NULL,
+          total INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS cart_table (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          productId INTEGER,
+          name TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          totalPrice INTEGER NOT NULL,
+          extras TEXT
+        );
+      `);
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la base de données :", error);
+    }
   },
 
   /**
@@ -92,7 +96,7 @@ export const Database = {
   },
 
   /**
-   * Gestion du PANIER (cart_table) - Requis par le nouveau guide.
+   * Gestion du PANIER (cart_table).
    */
   addToCart: (productId, name, quantity, totalPrice, extrasJson) => {
     db.runSync(
