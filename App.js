@@ -291,14 +291,13 @@ export default function App() {
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // 1. SÉCURITÉ SPLASH SCREEN : Timeout de secours
+  // 1. SPLASH SCREEN ÉCLAIR : Timeout de secours ultra-court (1.5s)
   useEffect(() => {
     const splashTimeout = setTimeout(() => {
       if (splashVisible) {
-        console.log("Fallback: Forcer la fin du Splash Screen");
         setSplashVisible(false);
       }
-    }, 6000); // 6 secondes max pour la vidéo
+    }, 1500); 
     return () => clearTimeout(splashTimeout);
   }, [splashVisible]);
 
@@ -403,25 +402,23 @@ export default function App() {
     setView('checkout');
   };
 
-  // RENDU DU SPLASH SCREEN
+  // RENDU DU SPLASH SCREEN ÉCLAIR
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
         <Video
-          source={require('./assets/1000117326.mp4')} // Utilisation de require pour assets Expo
+          source={require('./assets/lv_0_20260201104716.mp4')}
           style={StyleSheet.absoluteFill}
           resizeMode={ResizeMode.COVER}
-          shouldPlay
+          shouldPlay={true}
           isLooping={false}
+          shouldRasterizeIOS={true} // Pré-chargement pour éviter le flash noir
           onPlaybackStatusUpdate={(status) => {
             if (status.didJustFinish) {
               setSplashVisible(false);
             }
           }}
-          onError={(e) => {
-            console.error("Erreur lecture vidéo:", e);
-            setSplashVisible(false);
-          }}
+          onError={() => setSplashVisible(false)}
         />
       </View>
     );
@@ -434,7 +431,7 @@ export default function App() {
           <IconChevronRight size={20} />
         </Pressable>
 
-        {/* LOGO SANS FOND */}
+        {/* LOGO SANS FOND - TRANSPARENCE ABSOLUE */}
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
             <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
@@ -451,7 +448,7 @@ export default function App() {
           </Text>
         </View>
 
-        {/* CAROUSEL AVEC SWIPE ET ANIMATIONS */}
+        {/* CAROUSEL AVEC SWIPE ET ANIMATIONS FOCUS */}
         <View style={styles.carouselContainer}>
           <Animated.ScrollView
             horizontal
@@ -689,7 +686,7 @@ const styles = StyleSheet.create({
   tablet: { width: 390, height: 780, backgroundColor: '#09090b', borderRadius: 48, overflow: 'hidden', paddingVertical: 20 },
   adminAccess: { position: 'absolute', top: 30, left: 20, zIndex: 50 },
   logoWrapper: { alignItems: 'center', marginBottom: 10, backgroundColor: 'transparent' },
-  logo: { width: 120, height: 60 },
+  logo: { width: 120, height: 60, backgroundColor: 'transparent' },
   brandText: { color: '#FFF', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
   priceContainer: { alignItems: 'center', height: 80 },
   price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic' },
