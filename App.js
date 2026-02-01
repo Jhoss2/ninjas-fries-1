@@ -38,12 +38,6 @@ const IconPlus = () => (
   </Svg>
 );
 
-const IconMinus = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24">
-    <Line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="3" />
-  </Svg>
-);
-
 const IconX = ({ size = 20, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
     <Line x1="18" y1="6" x2="6" y2="18" stroke={color} strokeWidth="2.5" />
@@ -92,29 +86,6 @@ const IconCheck = () => (
 /* ===================== MODULES UTILITAIRES ===================== */
 const bleManager = new BleManager();
 
-export const requestBlePermissions = async () => {
-  if (Platform.OS === 'android') {
-    console.log("Demande de permissions Bluetooth...");
-  }
-};
-
-export const scanAndConnectPrinter = async (onConnected) => {
-  await requestBlePermissions();
-  bleManager.startDeviceScan(null, null, (error, device) => {
-    if (error) {
-      console.warn('BLE scan error', error);
-      return;
-    }
-    if (device.name && device.name.toLowerCase().includes('printer')) {
-      bleManager.stopDeviceScan();
-      device.connect()
-        .then(d => d.discoverAllServicesAndCharacteristics())
-        .then(d => onConnected(d))
-        .catch(err => console.warn('BLE connect error', err));
-    }
-  });
-};
-
 export const buildEscPosTicket = (order) => {
   let ticket = '';
   ticket += '\x1B\x40'; // init
@@ -122,54 +93,21 @@ export const buildEscPosTicket = (order) => {
   ticket += "NINJA'S FRIES\n\n";
   ticket += '\x1B\x61\x00'; // left
   order.items.forEach(item => {
-    ticket += `${item.quantity}x ${item.name}\n`;
+    ticket += `${item.quantity}x ${item.name.toUpperCase()}\n`;
     const extras = item.extras || {};
     const sauces = Array.isArray(extras.sauces) ? extras.sauces : [];
     const garnitures = Array.isArray(extras.garnitures) ? extras.garnitures : [];
     sauces.forEach(s => {
-      if (s?.name) ticket += ` - Sauce: ${s.name}\n`;
+      if (s?.name) ticket += ` - Sauce: ${s.name.toUpperCase()}\n`;
     });
     garnitures.forEach(g => {
-      if (g?.name) ticket += ` - Garniture: ${g.name}\n`;
+      if (g?.name) ticket += ` - Garniture: ${g.name.toUpperCase()}\n`;
     });
   });
   ticket += '\n--------------------------\n';
   ticket += `TOTAL: ${order.total} FCFA\n\n`;
   ticket += '\x1D\x56\x00'; // cut
   return ticket;
-};
-
-export const sendTicketToPrinter = async (printer, serviceUUID, characteristicUUID, ticket) => {
-  const base64Data = Buffer.from(ticket, 'ascii').toString('base64');
-  await printer.writeCharacteristicWithResponseForService(serviceUUID, characteristicUUID, base64Data);
-};
-
-export const printOrderViaBLE = async (order) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const ticket = buildEscPosTicket(order);
-      await scanAndConnectPrinter(async (device) => {
-        const SERVICE_UUID = PRINTER_SERVICE_UUID;
-        const CHARACTERISTIC_UUID = PRINTER_CHAR_UUID;
-        await sendTicketToPrinter(device, SERVICE_UUID, CHARACTERISTIC_UUID, ticket);
-        resolve(true);
-      });
-    } catch (err) {
-      console.warn('Erreur impression BLE', err);
-      reject(err);
-    }
-  });
-};
-
-export const exportOrdersToCSV = async (orderHistory) => {
-  let csv = 'Date;Heure;Articles;Total\n';
-  orderHistory.forEach(o => {
-    const items = o.items.map(i => `${i.quantity}x ${i.name}`).join(' | ');
-    csv += `${o.date};${o.time};${items};${o.total}\n`;
-  });
-  const fileUri = FileSystem.documentDirectory + `historique_${Date.now()}.csv`;
-  await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
-  await Sharing.shareAsync(fileUri);
 };
 
 /* ===================== COMPOSANT CHECKOUT (SQLITE) ===================== */
@@ -184,7 +122,8 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
   const refreshCart = () => {
     try {
       const items = Database.getCartItems();
-      const total = Database.getCartTotal();
+      // UTILISATION IMPÉRATIVE DU SUM SQL POUR LE TOTAL
+      const total = Database.getCartTotal(); 
       setCartItems(items || []);
       setTotalAmount(total || 0);
     } catch (e) {
@@ -271,7 +210,6 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
 
 /* ===================== COMPOSANT PRINCIPAL (APP) ===================== */
 export default function App() {
-  const { width } = useWindowDimensions();
   const [splashVisible, setSplashVisible] = useState(true);
   const [view, setView] = useState('menu');
   const [config, setConfig] = useState({ logoUrl: '', qrCodeUrl: '' });
@@ -291,7 +229,7 @@ export default function App() {
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // 1. SPLASH SCREEN ÉCLAIR : Timeout de secours ultra-court (1.5s)
+  // 1. SPLASH SCREEN ÉCLAIR : Timeout de secours (1.5s)
   useEffect(() => {
     const splashTimeout = setTimeout(() => {
       if (splashVisible) {
@@ -383,7 +321,6 @@ export default function App() {
       setOrderHistory(Database.getOrders());
       Database.clearCart();
       setOrderSent(true);
-      try { await printOrderViaBLE(orderData); } catch (err) { console.warn('Echec impression:', err); }
       
       // REDIRECTION AUTOMATIQUE SUCCESS SCREEN (3s)
       setTimeout(() => {
@@ -392,7 +329,6 @@ export default function App() {
       }, 3000);
     } catch (sqlError) {
       console.error("Erreur critique SQL:", sqlError);
-      Alert.alert("Erreur", "La commande n'a pas pu être enregistrée.");
     }
   };
 
@@ -402,7 +338,7 @@ export default function App() {
     setView('checkout');
   };
 
-  // RENDU DU SPLASH SCREEN ÉCLAIR
+  // RENDU DU SPLASH SCREEN ÉCLAIR (Animation 1s)
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
@@ -412,7 +348,7 @@ export default function App() {
           resizeMode={ResizeMode.COVER}
           shouldPlay={true}
           isLooping={false}
-          shouldRasterizeIOS={true} // Pré-chargement pour éviter le flash noir
+          shouldRasterizeIOS={true} 
           onPlaybackStatusUpdate={(status) => {
             if (status.didJustFinish) {
               setSplashVisible(false);
@@ -431,7 +367,7 @@ export default function App() {
           <IconChevronRight size={20} />
         </Pressable>
 
-        {/* LOGO SANS FOND - TRANSPARENCE ABSOLUE */}
+        {/* LOGO TRANSPARENCE ABSOLUE */}
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
             <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
@@ -448,7 +384,7 @@ export default function App() {
           </Text>
         </View>
 
-        {/* CAROUSEL AVEC SWIPE ET ANIMATIONS FOCUS */}
+        {/* CAROUSEL AVEC ANIMATIONS FOCUS */}
         <View style={styles.carouselContainer}>
           <Animated.ScrollView
             horizontal
@@ -484,28 +420,22 @@ export default function App() {
           </Animated.ScrollView>
         </View>
 
-        {/* NOM DU PLAT ET QUANTITÉ */}
+        {/* NOM EN MAJUSCULES */}
         <View style={styles.infoSection}>
           <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
           <View style={styles.quantityRow}>
-            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(-1)}>
-              <Text style={styles.qtyBtnText}>-</Text>
-            </Pressable>
+            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(-1)}><Text style={styles.qtyBtnText}>-</Text></Pressable>
             <Text style={styles.qtyBadgeText}>{quantity}</Text>
-            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(1)}>
-              <Text style={styles.qtyBtnText}>+</Text>
-            </Pressable>
+            <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(1)}><Text style={styles.qtyBtnText}>+</Text></Pressable>
           </View>
         </View>
 
-        {/* INDICATEURS DE SLIDE */}
         <View style={styles.pagination}>
           {menuItems.map((_, i) => (
             <View key={i} style={[styles.dot, { width: currentIndex === i ? 24 : 8, backgroundColor: currentIndex === i ? '#f97316' : '#27272a' }]} />
           ))}
         </View>
 
-        {/* SÉLECTEURS DE SAUCES ET GARNITURES */}
         {currentItem && (
           <View style={styles.pickers}>
             <Pressable style={styles.pickerBtn} onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}>
@@ -532,12 +462,10 @@ export default function App() {
           </View>
         )}
 
-        {/* BOUTON COMMANDER */}
         <Pressable style={styles.orderBtn} onPress={addToCart}>
           <Text style={styles.orderText}>COMMANDER</Text>
         </Pressable>
 
-        {/* MODALS */}
         <Modal visible={view === 'checkout'} animationType="slide" transparent>
           <CheckoutScreen config={config} onConfirm={validateOrder} onClose={() => setView('menu')} onRemoveItem={() => {}} />
         </Modal>
@@ -584,10 +512,10 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
     if (!formItem.name) return;
     try {
       if (editingId) {
-        Database.updateProduct(editingId, formItem.name, parseInt(formItem.price) || 0, formItem.image);
+        Database.updateProduct(editingId, formItem.name.toUpperCase(), parseInt(formItem.price) || 0, formItem.image);
         setEditingId(null);
       } else {
-        Database.saveProduct(formItem.name, parseInt(formItem.price) || 0, formItem.image, activeForm);
+        Database.saveProduct(formItem.name.toUpperCase(), parseInt(formItem.price) || 0, formItem.image, activeForm);
       }
       setMenuItems(Database.getProducts('plat') || []);
       setSauces(Database.getProducts('sauce') || []);
@@ -653,7 +581,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
                           <Text style={styles.historyDate}>{order.date} - {order.time}</Text>
                           <Text style={styles.historyTotal}>{order.total} F</Text>
                         </View>
-                        {JSON.parse(order.items).map((it, idx) => <View key={idx} style={styles.historyItem}><Text style={styles.historyItemText}>{it.quantity}x {it.name}</Text></View>)}
+                        {JSON.parse(order.items).map((it, idx) => <View key={idx} style={styles.historyItem}><Text style={styles.historyItemText}>{it.quantity}x {it.name.toUpperCase()}</Text></View>)}
                       </View>
                     ))
                   }
@@ -663,7 +591,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
                 <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
                   {(activeForm === 'list_plats' ? menuItems : activeForm === 'list_sauces' ? sauces : garnitures).map((item) => (
                     <View key={item.id} style={styles.adminHorizontalCard}>
-                      <View style={styles.cardLeftContent}><Image source={{ uri: item.image }} style={styles.cardSmallThumb} /><View><Text style={styles.cardMainText}>{item.name}</Text>{activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}</View></View>
+                      <View style={styles.cardLeftContent}><Image source={{ uri: item.image }} style={styles.cardSmallThumb} /><View><Text style={styles.cardMainText}>{item.name.toUpperCase()}</Text>{activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}</View></View>
                       <View style={styles.cardActions}>
                         <Pressable style={styles.actionEdit} onPress={() => { setEditingId(item.id); setFormItem({ name: item.name, price: item.price.toString(), image: item.image, type: activeForm.replace('list_', '').replace(/s$/, '') }); setActiveForm(activeForm.replace('list_', '').replace(/s$/, '')); }}><Text style={styles.actionBtnText}>MODIFIER</Text></Pressable>
                         <Pressable onPress={() => { Database.deleteProduct(item.id); setMenuItems(Database.getProducts('plat') || []); setSauces(Database.getProducts('sauce') || []); setGarnitures(Database.getProducts('garniture') || []); }}><IconX size={20} color="#ef4444" /></Pressable>
