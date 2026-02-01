@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
+// Correction de l'import (import minuscule)
 const db = SQLite.openDatabaseSync('ninjas_fries.db');
 
 export const Database = {
@@ -37,7 +38,7 @@ export const Database = {
         );
       `);
     } catch (error) {
-      console.error("Erreur lors de l'initialisation de la base de données :", error);
+      console.error("Erreur d'initialisation de la base de données:", error);
     }
   },
 
@@ -111,7 +112,7 @@ export const Database = {
 
   getCartTotal: () => {
     const result = db.getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
-    return result ? result.grandTotal || 0 : 0;
+    return result ? (result.grandTotal || 0) : 0;
   },
 
   removeFromCart: (id) => {
