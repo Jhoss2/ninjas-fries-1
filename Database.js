@@ -1,172 +1,137 @@
-import * as SQLite from 'expo-sqlite';
+const SQLite = require('expo-sqlite');
 
-/**
- * Correction pour Codemagic & Prebuild :
- * On n'ouvre pas la connexion immédiatement au chargement du script.
- * On utilise une fonction pour récupérer l'instance uniquement à l'exécution.
- */
-let _db = null;
+const db = SQLite.openDatabaseSync('ninjas_fries.db');
 
-const getDb = () => {
-  if (!_db) {
-    _db = SQLite.openDatabaseSync('ninjas_fries.db');
-  }
-  return _db;
-};
-
-export const Database = {
+const Base de données = {
   /**
-   * Initialise les tables de la base de données si elles n'existent pas.
+   * Initialiser les tables de la base de données si elles n'existent pas.
    */
   init: () => {
-    try {
-      const db = getDb();
-      db.execSync(`
-        CREATE TABLE IF NOT EXISTS products (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          price INTEGER NOT NULL,
-          image TEXT,
-          type TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT
-        );
-        CREATE TABLE IF NOT EXISTS orders (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT NOT NULL,
-          time TEXT NOT NULL,
-          items TEXT NOT NULL,
-          total INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS cart_table (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          productId INTEGER,
-          name TEXT NOT NULL,
-          quantity INTEGER NOT NULL,
-          totalPrice INTEGER NOT NULL,
-          extras TEXT
-        );
-      `);
-    } catch (error) {
-      console.error("Init Error:", error);
-    }
+    db.execSync(`
+      CRÉER UNE TABLE SI ELLE N'EXISTE PAS produits (
+        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
+        nom TEXTE NON NUL,
+        prix ENTIER NON NUL,
+        image TEXTE,
+        type TEXTE NON NUL
+      );
+      CRÉER UNE TABLE SI ELLE N'EXISTE PAS paramètres (
+        clé TEXTE CLÉ PRIMAIRE,
+        valeur TEXTE
+      );
+      CRÉER LA TABLE SI ELLE N'EXISTE PAS commandes (
+        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
+        date TEXTE NON NUL,
+        heure TEXTE NON NUL,
+        éléments TEXTE NON NUL,
+        total ENTIER NON NUL
+      );
+      CRÉER LA TABLE SI ELLE N'EXISTE PAS cart_table (
+        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
+        productId ENTIER,
+        nom TEXTE NON NUL,
+        quantité ENTIER NON NUL,
+        totalPrice ENTIER NON NUL,
+        texte supplémentaire
+      );
+    `);
   },
 
   /**
    * Gestion de la couleur du jour.
    */
-  getDailyColor: () => {
-    try {
-      const db = getDb();
-      const today = new Date().toLocaleDateString('fr-FR');
-      const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [`color_${today}`]);
-      
-      if (result) {
-        return result.value;
-      } else {
-        const colors = [
-          '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
-          '#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1',
-          '#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#fb7185',
-          '#fb923c','#fbbf24','#a3e635','#4ade80','#34d399','#2dd4bf',
-          '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
-        ];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [`color_${today}`, randomColor]);
-        return randomColor;
-      }
-    } catch (e) {
-      return '#f97316';
+  obtenirCouleurDuJour : () => {
+    const aujourd'hui = new Date().toLocaleDateString('fr-FR');
+    const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [`color_${today}`]);
+    
+    si (résultat) {
+      renvoyer result.value;
+    } autre {
+      const couleurs = [
+        '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
+        '#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1',
+        '#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#fb7185',
+        '#fb923c','#fbbf24','#a3e635','#4ade80','#34d399','#2dd4bf',
+        '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
+      ];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [`color_${today}`, randomColor]);
+      renvoyer une couleur aléatoire ;
     }
   },
 
-  getSetting: (key) => {
-    try {
-      return getDb().getFirstSync('SELECT value FROM settings WHERE key = ?', [key])?.value;
-    } catch (e) { return null; }
+  /**
+   * Gestion des paramètres.
+   */
+  obtenirSetting: (clé) => {
+    const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [key]);
+    retourner le résultat ? résultat.value : null;
   },
 
-  saveSetting: (key, value) => {
-    try {
-      getDb().runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
-    } catch (e) {}
+  saveSetting: (clé, valeur) => {
+    db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
   },
 
+  /**
+   * Gestion des produits.
+   */
   getProducts: (type) => {
-    try {
-      return getDb().getAllSync('SELECT * FROM products WHERE type = ?', [type]);
-    } catch (e) { return []; }
+    return db.getAllSync('SELECT * FROM products WHERE type = ?', [type]);
   },
 
-  saveProduct: (name, price, image, type) => {
-    try {
-      getDb().runSync('INSERT INTO products (name, price, image, type) VALUES (?, ?, ?, ?)', [name, price, image, type]);
-    } catch (e) {}
+  enregistrerProduit: (nom, prix, image, type) => {
+    db.runSync('INSERT INTO products (name, price, image, type) VALUES (?, ?, ?, ?)', [name, price, image, type]);
   },
 
-  updateProduct: (id, name, price, image) => {
-    try {
-      getDb().runSync('UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?', [name, price, image, id]);
-    } catch (e) {}
+  mettre à jour le produit : (id, nom, prix, image) => {
+    db.runSync('UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?', [name, price, image, id]);
   },
 
-  deleteProduct: (id) => {
-    try {
-      getDb().runSync('DELETE FROM products WHERE id = ?', [id]);
-    } catch (e) {}
+  supprimerProduit : (id) => {
+    db.runSync('SUPPRIMER DE produits OÙ id = ?', [id]);
   },
 
-  addToCart: (productId, name, quantity, totalPrice, extrasJson) => {
-    try {
-      getDb().runSync(
-        'INSERT INTO cart_table (productId, name, quantity, totalPrice, extras) VALUES (?, ?, ?, ?, ?)',
-        [productId, name, quantity, totalPrice, extrasJson]
-      );
-    } catch (e) {}
+  /**
+   * Gestion du PANIER (cart_table) - Requis par le nouveau guide.
+   */
+  ajouterAuPanier: (productId, nom, quantité, prixTotal, extrasJson) => {
+    db.runSync(
+      'INSERT INTO cart_table (productId, name, quantity, totalPrice, extras) VALUES (?, ?, ?, ?, ?)',
+      [productId, nom, quantité, prix total, extrasJson]
+    );
   },
 
   getCartItems: () => {
-    try {
-      return getDb().getAllSync('SELECT * FROM cart_table');
-    } catch (e) { return []; }
+    retourner db.getAllSync('SELECT * FROM cart_table');
   },
 
-  getCartTotal: () => {
-    try {
-      const result = getDb().getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
-      return result ? result.grandTotal || 0 : 0;
-    } catch (e) { return 0; }
+  obtenirTotalDuPanier: () => {
+    const result = db.getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
+    retourner le résultat ? résultat.grandTotal || 0 : 0 ;
   },
 
-  removeFromCart: (id) => {
-    try {
-      getDb().runSync('DELETE FROM cart_table WHERE id = ?', [id]);
-    } catch (e) {}
+  supprimerDuPanier : (id) => {
+    db.runSync('SUPPRIMER DE LA TABLE cart_table OÙ id = ?', [id]);
   },
 
-  clearCart: () => {
-    try {
-      getDb().runSync('DELETE FROM cart_table');
-    } catch (e) {}
+  effacerPanier: () => {
+    db.runSync('SUPPRIMER DE cart_table');
   },
 
-  getOrders: () => {
-    try {
-      return getDb().getAllSync('SELECT * FROM orders ORDER BY id DESC');
-    } catch (e) { return []; }
+  /**
+   * Gestion des commandes.
+   */
+  obtenirCommandes: () => {
+    return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
   },
 
-  getSales: () => {
-    try {
-      return getDb().getAllSync('SELECT * FROM orders ORDER BY id DESC');
-    } catch (e) { return []; }
+  obtenirVentes: () => {
+    return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
   },
 
-  insertOrder: (itemsJson, total, date, time) => {
-    try {
-      getDb().runSync('INSERT INTO orders (items, total, date, time) VALUES (?, ?, ?, ?)', [itemsJson, total, date, time]);
-    } catch (e) {}
+  insérerOrder: (itemsJson, total, date, heure) => {
+    db.runSync('INSERT INTO orders (items, total, date, time) VALUES (?, ?, ?, ?)', [itemsJson, total, date, time]);
   }
 };
+
+module.exports = { Base de données };
