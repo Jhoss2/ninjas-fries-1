@@ -18,11 +18,19 @@ const { BlurView } = require('expo-blur');
 // IMPORT UNIQUE POUR LA PERSISTANCE
 const { Database } = require('./Database');
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /* ===================== CONSTANTES ===================== */
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
+
+// --- CONFIGURATION GÉOMÉTRIQUE CARROUSEL NINJA ---
+// La carte centrale occupe 40% de la largeur écran
+const CARD_WIDTH = SCREEN_WIDTH * 0.4; 
+// Espacement réduit pour forcer les voisins à déborder de 50%
+const SPACING = 10;
+const ITEM_SIZE = CARD_WIDTH + SPACING;
+// -------------------------------------------------
 
 const DAILY_COLORS = [
   '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
@@ -393,39 +401,68 @@ function App() {
         </View>
 
         <View style={styles.carouselContainer}>
-          <Animated.ScrollView
-            horizontal
-            pagingEnabled
-            snapToInterval={SCREEN_WIDTH * 0.8}
-            decelerationRate="fast"
-            showsHorizontalScrollIndicator={false}
-            onScroll={onScroll}
-            scrollEventThrottle={16}
-            contentContainerStyle={{ paddingHorizontal: SCREEN_WIDTH * 0.1 }}
-          >
-            {menuItems.map((item, index) => {
-              const scale = scrollX.interpolate({
-                inputRange: [(index - 1) * (SCREEN_WIDTH * 0.8), index * (SCREEN_WIDTH * 0.8), (index + 1) * (SCREEN_WIDTH * 0.8)],
-                outputRange: [0.8, 1.1, 0.8],
-                extrapolate: 'clamp',
-              });
-              const opacity = scrollX.interpolate({
-                inputRange: [(index - 1) * (SCREEN_WIDTH * 0.8), index * (SCREEN_WIDTH * 0.8), (index + 1) * (SCREEN_WIDTH * 0.8)],
-                outputRange: [0.5, 1, 0.5],
-                extrapolate: 'clamp',
-              });
-              return (
-                <View key={item.id} style={styles.swipeItem}>
-                  <Animated.Image
+        
+        {/* MASQUES DE BORDURE (EFFET DÉBORDEMENT 50%) */}
+        <View style={[styles.fadeEdge, { left: 0 }]} />
+        <View style={[styles.fadeEdge, { right: 0 }]} />
+
+        <Animated.ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={ITEM_SIZE} // Aimantage précis sur la taille de l'item
+          decelerationRate="fast"
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true }
+          )}
+          contentContainerStyle={{ 
+            paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2, // Centrage parfait du premier item
+            alignItems: 'center' 
+          }}
+        >
+          {menuItems.map((item, index) => {
+            const inputRange = [
+              (index - 1) * ITEM_SIZE,
+              index * ITEM_SIZE,
+              (index + 1) * ITEM_SIZE,
+            ];
+
+            // ÉCHELLE : 1 au centre, 0.4 sur les côtés (Ratio Ninja)
+            const scale = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.4, 1, 0.4],
+              extrapolate: 'clamp',
+            });
+
+            // OPACITÉ : Très sombre sur les côtés pour le focus
+            const opacity = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.3, 1, 0.3],
+              extrapolate: 'clamp',
+            });
+
+            return (
+              <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center' }}>
+                <Animated.View style={[
+                  styles.card, 
+                  { transform: [{ scale }], opacity }
+                ]}>
+                  <Image
                     source={{ uri: item.image }}
-                    style={[styles.itemImage, { transform: [{ scale }], opacity }]}
+                    style={styles.itemImage}
                     resizeMode="contain"
                   />
-                </View>
-              );
-            })}
-          </Animated.ScrollView>
-        </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardTitle}>{item.name}</Text>
+                    <Text style={styles.cardPrice}>{item.price} F</Text>
+                  </View>
+                </Animated.View>
+              </View>
+            );
+          })}
+        </Animated.ScrollView>
+      </View>
 
         <View style={styles.infoSection}>
           <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
@@ -625,7 +662,15 @@ const styles = StyleSheet.create({
   priceContainer: { alignItems: 'center', height: 80 },
   price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic' },
   priceUnit: { fontSize: 22 },
-  carouselContainer: { height: 280, justifyContent: 'center', overflow: 'visible' },
+
+  // --- AJUSTEMENTS CARROUSEL NINJA ---
+  carouselContainer: { height: 350, justifyContent: 'center', overflow: 'visible', width: SCREEN_WIDTH },
+  fadeEdge: { position: 'absolute', top: 0, bottom: 0, width: SCREEN_WIDTH * 0.25, backgroundColor: 'transparent', zIndex: 10 },
+  card: { width: CARD_WIDTH, height: 300, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
+  cardInfo: { alignItems: 'center', marginTop: 10 },
+  cardTitle: { color: '#fff', fontSize: 16, fontWeight: '900', fontStyle: 'italic', textAlign: 'center' },
+  cardPrice: { color: '#f97316', fontSize: 18, fontWeight: '900', marginTop: 5 },
+  
   swipeItem: { width: SCREEN_WIDTH * 0.8, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   itemImage: { width: 220, height: 220, shadowColor: "#f97316", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 30, backgroundColor: 'transparent' },
   infoSection: { alignItems: 'center', marginTop: 10 },
@@ -727,5 +772,4 @@ const styles = StyleSheet.create({
   actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
 });
-
 module.exports = App;
