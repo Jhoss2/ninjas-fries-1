@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
+const React = require('react');
+const { useState, useEffect, useRef } = React;
+const {
   View, Text, Image, Pressable, TextInput, ScrollView,
   Modal, StyleSheet, Platform, useWindowDimensions, Alert,
   Animated, SafeAreaView, Dimensions
-} from 'react-native';
-import Svg, { Line, Polyline, Rect, Path, Circle } from 'react-native-svg';
-import * as ImagePicker from 'expo-image-picker';
-import { BleManager } from 'react-native-ble-plx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { Buffer } from 'buffer';
-import { Video, ResizeMode } from 'expo-av';
-import { BlurView } from 'expo-blur';
+} = require('react-native');
+const Svg = require('react-native-svg').default;
+const { Line, Polyline, Rect, Path, Circle } = require('react-native-svg');
+const ImagePicker = require('expo-image-picker');
+const { BleManager } = require('react-native-ble-plx');
+const FileSystem = require('expo-file-system');
+const Sharing = require('expo-sharing');
+const { Buffer } = require('buffer');
+const { Video, ResizeMode } = require('expo-av');
+const { BlurView } = require('expo-blur');
 
 // IMPORT UNIQUE POUR LA PERSISTANCE
 const { Database } = require('./Database');
@@ -86,7 +88,7 @@ const IconCheck = () => (
 /* ===================== MODULES UTILITAIRES ===================== */
 const bleManager = new BleManager();
 
-export const buildEscPosTicket = (order) => {
+const buildEscPosTicket = (order) => {
   let ticket = '';
   ticket += '\x1B\x40'; // init
   ticket += '\x1B\x61\x01'; // center
@@ -110,6 +112,17 @@ export const buildEscPosTicket = (order) => {
   return ticket;
 };
 
+const exportOrdersToCSV = async (orderHistory) => {
+  let csv = 'Date;Heure;Articles;Total\n';
+  orderHistory.forEach(o => {
+    const items = o.items.map(i => `${i.quantity}x ${i.name}`).join(' | ');
+    csv += `${o.date};${o.time};${items};${o.total}\n`;
+  });
+  const fileUri = FileSystem.documentDirectory + `historique_${Date.now()}.csv`;
+  await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+  await Sharing.shareAsync(fileUri);
+};
+
 /* ===================== COMPOSANT CHECKOUT (SQLITE) ===================== */
 const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
   const [cartItems, setCartItems] = useState([]);
@@ -122,7 +135,6 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
   const refreshCart = () => {
     try {
       const items = Database.getCartItems();
-      // UTILISATION IMPÉRATIVE DU SUM SQL POUR LE TOTAL
       const total = Database.getCartTotal(); 
       setCartItems(items || []);
       setTotalAmount(total || 0);
@@ -209,7 +221,7 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
 };
 
 /* ===================== COMPOSANT PRINCIPAL (APP) ===================== */
-export default function App() {
+function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const [view, setView] = useState('menu');
   const [config, setConfig] = useState({ logoUrl: '', qrCodeUrl: '' });
@@ -322,7 +334,6 @@ export default function App() {
       Database.clearCart();
       setOrderSent(true);
       
-      // REDIRECTION AUTOMATIQUE SUCCESS SCREEN (3s)
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
@@ -338,7 +349,6 @@ export default function App() {
     setView('checkout');
   };
 
-  // RENDU DU SPLASH SCREEN ÉCLAIR (Animation 1s)
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
@@ -367,7 +377,6 @@ export default function App() {
           <IconChevronRight size={20} />
         </Pressable>
 
-        {/* LOGO TRANSPARENCE ABSOLUE */}
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
             <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
@@ -376,7 +385,6 @@ export default function App() {
           )}
         </View>
 
-        {/* PRIX DYNAMIQUE */}
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
             {currentItem ? totalPrice : 0}
@@ -384,7 +392,6 @@ export default function App() {
           </Text>
         </View>
 
-        {/* CAROUSEL AVEC ANIMATIONS FOCUS */}
         <View style={styles.carouselContainer}>
           <Animated.ScrollView
             horizontal
@@ -420,7 +427,6 @@ export default function App() {
           </Animated.ScrollView>
         </View>
 
-        {/* NOM EN MAJUSCULES */}
         <View style={styles.infoSection}>
           <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
           <View style={styles.quantityRow}>
@@ -721,3 +727,5 @@ const styles = StyleSheet.create({
   actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
   emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
 });
+
+module.exports = App;
