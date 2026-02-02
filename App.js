@@ -12,20 +12,22 @@ import * as Sharing from 'expo-sharing';
 import { Buffer } from 'buffer';
 import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
+
 // IMPORT UNIQUE POUR LA PERSISTANCE
-import { Database } from './Database';
+const { Database } = require('./Database');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /* ===================== CONSTANTES ===================== */
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
+
 const DAILY_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
-  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
-  '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#fb7185',
-  '#fb923c', '#fbbf24', '#a3e635', '#4ade80', '#34d399', '#2dd4bf',
-  '#22d3ee', '#38bdf8', '#60a5fa', '#818cf8', '#a78bfa', '#c084fc'
+  '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
+  '#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1',
+  '#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#fb7185',
+  '#fb923c','#fbbf24','#a3e635','#4ade80','#34d399','#2dd4bf',
+  '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
 ];
 
 /* ===================== ICÔNES ===================== */
@@ -57,27 +59,27 @@ const IconCamera = () => (
 
 const IconChevronLeft = ({ size = 24, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <Polyline points="15 18 9 12 15 6" stroke={color} strokeWidth="2.5" fill="none" />
+    <Polyline points="15 18 9 12 15 6" stroke={color} strokeWidth="2.5" fill="none"/>
   </Svg>
 );
 
 const IconChevronRight = ({ size = 24, color = "white" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <Polyline points="9 18 15 12 9 6" stroke={color} strokeWidth="2.5" fill="none" />
+    <Polyline points="9 18 15 12 9 6" stroke={color} strokeWidth="2.5" fill="none"/>
   </Svg>
 );
 
 const IconLock = () => (
   <Svg width={30} height={30} viewBox="0 0 24 24">
-    <Rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="white" strokeWidth="2" fill="none" />
-    <Path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" strokeWidth="2" fill="none" />
+    <Rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="white" strokeWidth="2" fill="none"/>
+    <Path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" strokeWidth="2" fill="none"/>
   </Svg>
 );
 
 const IconCheck = () => (
   <Svg width={80} height={80} viewBox="0 0 24 24">
-    <Path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="white" strokeWidth="2" fill="none" />
-    <Polyline points="22 4 12 14.01 9 11.01" stroke="white" strokeWidth="2" fill="none" />
+    <Path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="white" strokeWidth="2" fill="none"/>
+    <Polyline points="22 4 12 14.01 9 11.01" stroke="white" strokeWidth="2" fill="none"/>
   </Svg>
 );
 
@@ -120,7 +122,8 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
   const refreshCart = () => {
     try {
       const items = Database.getCartItems();
-      const total = Database.getCartTotal();
+      // UTILISATION IMPÉRATIVE DU SUM SQL POUR LE TOTAL
+      const total = Database.getCartTotal(); 
       setCartItems(items || []);
       setTotalAmount(total || 0);
     } catch (e) {
@@ -146,6 +149,7 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
             <Text style={styles.checkoutTitleText}>VÉRIFIEZ VOTRE COMMANDE</Text>
             <View style={styles.headerSeparator} />
           </View>
+
           <View style={styles.itemsList}>
             {cartItems.map((item, index) => {
               const extras = JSON.parse(item.extras || '{}');
@@ -180,12 +184,13 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
               );
             })}
           </View>
+
           <View style={styles.whiteCard}>
             <View style={styles.qrWrapper}>
               {config.qrCodeUrl ? (
                 <Image source={{ uri: config.qrCodeUrl }} style={styles.qrImage} resizeMode="contain" />
               ) : (
-                <Text style={{ color: '#ccc', fontSize: 12 }}>QR CODE</Text>
+                <Text style={{color: '#ccc', fontSize: 12}}>QR CODE</Text>
               )}
             </View>
             <View style={styles.totalSection}>
@@ -193,6 +198,7 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
               <Text style={styles.totalValue}>{totalAmount} FCFA</Text>
             </View>
           </View>
+
           <Pressable style={styles.confirmButton} onPress={onConfirm}>
             <Text style={styles.confirmButtonText}>VALIDER LA COMMANDE</Text>
           </Pressable>
@@ -220,15 +226,20 @@ export default function App() {
   const [selectedExtras, setSelectedExtras] = useState({ sauces: [], garnitures: [] });
   const [orderHistory, setOrderHistory] = useState([]);
   const [activeForm, setActiveForm] = useState(null);
+
   const scrollX = useRef(new Animated.Value(0)).current;
 
+  // 1. SPLASH SCREEN ÉCLAIR : Timeout de secours (1.5s)
   useEffect(() => {
     const splashTimeout = setTimeout(() => {
-      if (splashVisible) { setSplashVisible(false); }
-    }, 1500);
+      if (splashVisible) {
+        setSplashVisible(false);
+      }
+    }, 1500); 
     return () => clearTimeout(splashTimeout);
   }, [splashVisible]);
 
+  // 2. INITIALISATION SQLITE SÉCURISÉE
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -239,7 +250,7 @@ export default function App() {
         setMenuItems(Database.getProducts('plat') || []);
         setSauces(Database.getProducts('sauce') || []);
         setGarnitures(Database.getProducts('garniture') || []);
-        setOrderHistory(Database.getOrders() || []);
+        setOrderHistory(Database.getSales() || []);
       } catch (e) {
         console.error("Erreur d'initialisation SQL :", e);
       }
@@ -272,11 +283,7 @@ export default function App() {
   const handleImageUpload = async (callback) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { alert('Permission nécessaire'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      base64: true
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, base64: true });
     if (!result.canceled) callback(`data:image/jpeg;base64,${result.assets[0].base64}`);
   };
 
@@ -301,13 +308,21 @@ export default function App() {
     const cartItems = Database.getCartItems();
     if (cartItems.length === 0) return;
     const total = Database.getCartTotal();
-    const orderDate = new Date().toLocaleDateString('fr-FR');
-    const orderTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const orderData = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('fr-FR'),
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      items: cartItems,
+      total: total,
+      status: 'payé'
+    };
     try {
-      Database.insertOrder(JSON.stringify(cartItems), total, orderDate, orderTime);
+      Database.insertOrder(JSON.stringify(orderData.items), orderData.total, orderData.date, orderData.time);
       setOrderHistory(Database.getOrders());
       Database.clearCart();
       setOrderSent(true);
+      
+      // REDIRECTION AUTOMATIQUE SUCCESS SCREEN (3s)
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
@@ -323,10 +338,7 @@ export default function App() {
     setView('checkout');
   };
 
-  const exportOrdersToCSV = (history) => {
-    console.log('Export CSV:', history);
-  };
-
+  // RENDU DU SPLASH SCREEN ÉCLAIR (Animation 1s)
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
@@ -336,7 +348,12 @@ export default function App() {
           resizeMode={ResizeMode.COVER}
           shouldPlay={true}
           isLooping={false}
-          onPlaybackStatusUpdate={(status) => { if (status.didJustFinish) { setSplashVisible(false); } }}
+          shouldRasterizeIOS={true} 
+          onPlaybackStatusUpdate={(status) => {
+            if (status.didJustFinish) {
+              setSplashVisible(false);
+            }
+          }}
           onError={() => setSplashVisible(false)}
         />
       </View>
@@ -350,14 +367,16 @@ export default function App() {
           <IconChevronRight size={20} />
         </Pressable>
 
+        {/* LOGO TRANSPARENCE ABSOLUE */}
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
             <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
           ) : (
-            <Text style={styles.brandText}>NINJA <Text style={{ color: '#f97316' }}>FRIES</Text></Text>
+            <Text style={styles.brandText}>NINJA <Text style={{color: '#f97316'}}>FRIES</Text></Text>
           )}
         </View>
 
+        {/* PRIX DYNAMIQUE */}
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
             {currentItem ? totalPrice : 0}
@@ -365,6 +384,7 @@ export default function App() {
           </Text>
         </View>
 
+        {/* CAROUSEL AVEC ANIMATIONS FOCUS */}
         <View style={styles.carouselContainer}>
           <Animated.ScrollView
             horizontal
@@ -400,6 +420,7 @@ export default function App() {
           </Animated.ScrollView>
         </View>
 
+        {/* NOM EN MAJUSCULES */}
         <View style={styles.infoSection}>
           <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
           <View style={styles.quantityRow}>
@@ -431,12 +452,8 @@ export default function App() {
           <View style={styles.extrasDropdown}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {(showSaucePicker ? sauces : garnitures).map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)}
-                  style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}
-                >
-                  {s.image ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" /> : <View style={styles.extraImageFallback}><Text style={{ fontSize: 8, color: '#555' }}>IMAGE</Text></View>}
+                <Pressable key={s.id} onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)} style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}>
+                  {s.image ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" /> : <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>}
                   <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
                   {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
                 </Pressable>
@@ -450,7 +467,7 @@ export default function App() {
         </Pressable>
 
         <Modal visible={view === 'checkout'} animationType="slide" transparent>
-          <CheckoutScreen config={config} onConfirm={validateOrder} onClose={() => setView('menu')} onRemoveItem={() => { }} />
+          <CheckoutScreen config={config} onConfirm={validateOrder} onClose={() => setView('menu')} onRemoveItem={() => {}} />
         </Modal>
 
         {orderSent && (
@@ -465,22 +482,21 @@ export default function App() {
           <View style={styles.modal}><View style={styles.passBox}><IconLock />
             <TextInput secureTextEntry style={styles.passInput} value={passwordInput} onChangeText={setPasswordInput} placeholder="Code Corporation" placeholderTextColor="#777" />
             <View style={styles.passActions}>
-              <Pressable style={styles.cancelBtn} onPress={() => setShowPassModal(false)}><Text style={{ color: 'white' }}>ANNULER</Text></Pressable>
-              <Pressable style={styles.confirmBtn} onPress={checkAdminAccess}><Text style={{ color: 'black' }}>ENTRER</Text></Pressable>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowPassModal(false)}><Text style={{color: 'white'}}>ANNULER</Text></Pressable>
+              <Pressable style={styles.confirmBtn} onPress={checkAdminAccess}><Text style={{color: 'black'}}>ENTRER</Text></Pressable>
             </View>
           </View></View>
         </Modal>
 
         {view === 'settings' && (
-          <AdminPanel
-            styles={styles} config={config} setConfig={setConfig}
-            menuItems={menuItems} setMenuItems={setMenuItems}
-            sauces={sauces} setSauces={setSauces}
-            garnitures={garnitures} setGarnitures={setGarnitures}
-            activeForm={activeForm} setActiveForm={setActiveForm}
-            setView={setView} orderHistory={orderHistory}
-            handleExportCSV={exportOrdersToCSV}
-            handleImageUpload={handleImageUpload}
+          <AdminPanel 
+            styles={styles} config={config} setConfig={setConfig} 
+            menuItems={menuItems} setMenuItems={setMenuItems} 
+            sauces={sauces} setSauces={setSauces} 
+            garnitures={garnitures} setGarnitures={setGarnitures} 
+            activeForm={activeForm} setActiveForm={setActiveForm} 
+            setView={setView} orderHistory={orderHistory} 
+            handleExportCSV={exportOrdersToCSV} handleImageUpload={handleImageUpload} 
           />
         )}
       </View>
@@ -488,9 +504,7 @@ export default function App() {
   );
 }
 
-const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces,
-  setSauces, garnitures, setGarnitures, activeForm, setActiveForm, setView,
-  orderHistory, handleExportCSV, handleImageUpload }) => {
+const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces, setSauces, garnitures, setGarnitures, activeForm, setActiveForm, setView, orderHistory, handleExportCSV, handleImageUpload }) => {
   const [formItem, setFormItem] = useState({ name: '', price: '', image: '', type: 'plat' });
   const [editingId, setEditingId] = useState(null);
 
@@ -528,7 +542,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
             <Pressable style={styles.adminBtn} onPress={() => setActiveForm('list_garnitures')}><Text style={styles.adminBtnText}>LISTE DES GARNITURES</Text><IconChevronRight size={14} color="#f97316" /></Pressable>
             <Pressable style={styles.adminBtn} onPress={() => setActiveForm('logo')}><Text style={styles.adminBtnText}>LOGOS & QR</Text><IconChevronRight size={14} /></Pressable>
             <Pressable style={styles.adminBtn} onPress={() => setActiveForm('history')}><Text style={styles.adminBtnText}>HISTORIQUE DES VENTES</Text><IconChevronRight size={14} /></Pressable>
-            <Pressable style={styles.exportBtn} onPress={() => handleExportCSV(orderHistory)}><Text style={styles.exportText}>EXPORTER L'HISTORIQUE (CSV)</Text></Pressable>
+            <Pressable style={styles.exportBtn} onPress={() => handleExportCSV(orderHistory)}><Text style={styles.exportText}>EXPORTER L’HISTORIQUE (CSV)</Text></Pressable>
           </View>
         )}
         {activeForm && (
@@ -560,7 +574,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
               )}
               {activeForm === 'history' && (
                 <ScrollView style={{ maxHeight: 400 }}>
-                  {orderHistory.length === 0 ? <Text style={styles.emptyHistory}>AUCUNE COMMANDE ENREGISTRÉE</Text> :
+                  {orderHistory.length === 0 ? <Text style={styles.emptyHistory}>AUCUNE COMMANDE ENREGISTRÉE</Text> : 
                     orderHistory.map(order => (
                       <View key={order.id} style={[styles.historyCard, { borderLeftColor: DAILY_COLORS[parseInt(order.date.split('/')[0]) % 30] || '#f97316' }]}>
                         <View style={styles.historyHeader}>
@@ -580,12 +594,7 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
                       <View style={styles.cardLeftContent}><Image source={{ uri: item.image }} style={styles.cardSmallThumb} /><View><Text style={styles.cardMainText}>{item.name.toUpperCase()}</Text>{activeForm !== 'list_sauces' && <Text style={styles.cardSubText}>{item.price} FCFA</Text>}</View></View>
                       <View style={styles.cardActions}>
                         <Pressable style={styles.actionEdit} onPress={() => { setEditingId(item.id); setFormItem({ name: item.name, price: item.price.toString(), image: item.image, type: activeForm.replace('list_', '').replace(/s$/, '') }); setActiveForm(activeForm.replace('list_', '').replace(/s$/, '')); }}><Text style={styles.actionBtnText}>MODIFIER</Text></Pressable>
-                        <Pressable onPress={() => {
-                          Database.deleteProduct(item.id);
-                          setMenuItems(Database.getProducts('plat') || []);
-                          setSauces(Database.getProducts('sauce') || []);
-                          setGarnitures(Database.getProducts('garniture') || []);
-                        }}><IconX size={20} color="#ef4444" /></Pressable>
+                        <Pressable onPress={() => { Database.deleteProduct(item.id); setMenuItems(Database.getProducts('plat') || []); setSauces(Database.getProducts('sauce') || []); setGarnitures(Database.getProducts('garniture') || []); }}><IconX size={20} color="#ef4444" /></Pressable>
                       </View>
                     </View>
                   ))}
@@ -666,42 +675,42 @@ const styles = StyleSheet.create({
   successIconContainer: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   successTitle: { fontSize: 32, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
   successSubtitle: { fontSize: 14, fontWeight: '900', color: '#fff', marginTop: 10 },
-  modal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', padding: 20 },
-  passBox: { backgroundColor: '#18181b', padding: 35, borderRadius: 45, alignItems: 'center' },
-  passInput: { backgroundColor: '#27272a', color: '#fff', padding: 16, borderRadius: 25, marginVertical: 25, textAlign: 'center', width: '100%', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  passActions: { flexDirection: 'row', gap: 15 },
-  cancelBtn: { flex: 1, backgroundColor: '#27272a', padding: 16, borderRadius: 25, alignItems: 'center' },
-  confirmBtn: { flex: 1, backgroundColor: '#f97316', padding: 16, borderRadius: 25, alignItems: 'center' },
-  adminRoot: { ...StyleSheet.absoluteFillObject, backgroundColor: '#09090b', zIndex: 100 },
-  adminContainer: { padding: 25, gap: 25 },
-  adminHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  adminTitle: { color: '#f97316', fontWeight: '900', fontSize: 22, fontStyle: 'italic' },
-  iconBtn: { padding: 10 },
-  adminMenu: { gap: 15, marginTop: 25 },
-  adminBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181b', padding: 18, borderRadius: 25 },
-  adminBtnText: { color: '#fff', fontWeight: '900', fontSize: 14, fontStyle: 'italic' },
-  exportBtn: { backgroundColor: '#f97316', padding: 18, borderRadius: 25, marginTop: 15, alignItems: 'center' },
-  exportText: { color: '#000', fontWeight: '900', fontSize: 14 },
-  adminFormWrapper: { marginTop: 25 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
-  backText: { color: '#777', fontWeight: '900', fontSize: 16 },
-  formCard: { backgroundColor: '#18181b', padding: 25, borderRadius: 30 },
-  formTitle: { color: '#f97316', fontWeight: '900', fontSize: 16, marginBottom: 15, fontStyle: 'italic' },
-  imagePicker: { width: 100, height: 100, borderRadius: 20, backgroundColor: '#27272a', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  imagePreview: { width: 100, height: 100, borderRadius: 20, resizeMode: 'contain' },
-  logoPicker: { width: 100, height: 100, borderRadius: 20, backgroundColor: '#27272a', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  logoPreview: { width: 100, height: 100, borderRadius: 20, resizeMode: 'contain' },
-  qrPicker: { width: 100, height: 100, borderRadius: 20, backgroundColor: '#27272a', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  qrPreview: { width: 100, height: 100, borderRadius: 20, resizeMode: 'contain' },
-  input: { backgroundColor: '#27272a', color: '#fff', padding: 16, borderRadius: 25, marginBottom: 15, fontSize: 16 },
-  saveBtn: { backgroundColor: '#f97316', padding: 18, borderRadius: 25, marginTop: 15, alignItems: 'center' },
-  saveText: { fontWeight: '900', color: '#000', textAlign: 'center', fontSize: 16 },
-  historyCard: { backgroundColor: '#18181b', borderLeftWidth: 6, borderRadius: 15, padding: 15, marginVertical: 8 },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  historyDate: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  historyTotal: { color: '#f97316', fontWeight: '900', fontSize: 14 },
-  historyItem: { marginBottom: 6 },
-  historyItemText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  modal:{ flex:1, backgroundColor:'rgba(0,0,0,0.9)', justifyContent:'center', padding:20 },
+  passBox:{ backgroundColor:'#18181b', padding:35, borderRadius:45, alignItems: 'center' },
+  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginVertical:25, textAlign:'center', width: '100%', fontSize: 18, fontWeight:'900', fontStyle: 'italic' },
+  passActions:{ flexDirection:'row', gap:15 },
+  cancelBtn:{ flex:1, backgroundColor:'#27272a', padding:16, borderRadius:25, alignItems:'center' },
+  confirmBtn:{ flex:1, backgroundColor:'#f97316', padding:16, borderRadius:25, alignItems:'center' },
+  adminRoot:{ ...StyleSheet.absoluteFillObject, backgroundColor:'#09090b', zIndex:100 },
+  adminContainer:{ padding:25, gap:25 },
+  adminHeader:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  adminTitle:{ color:'#f97316', fontWeight:'900', fontSize:22, fontStyle: 'italic' },
+  iconBtn:{ padding:10 },
+  adminMenu:{ gap:15, marginTop:25 },
+  adminBtn:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', backgroundColor:'#18181b', padding:18, borderRadius:25 },
+  adminBtnText:{ color:'#fff', fontWeight:'900', fontSize:14, fontStyle: 'italic' },
+  exportBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:25, marginTop:15, alignItems:'center' },
+  exportText:{ color:'#000', fontWeight:'900', fontSize:14 },
+  adminFormWrapper:{ marginTop:25 },
+  backBtn:{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:15 },
+  backText:{ color:'#777', fontWeight:'900', fontSize: 16 },
+  formCard:{ backgroundColor:'#18181b', padding:25, borderRadius:30 },
+  formTitle:{ color:'#f97316', fontWeight:'900', fontSize:16, marginBottom:15, fontStyle: 'italic' },
+  imagePicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
+  imagePreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
+  logoPicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
+  logoPreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
+  qrPicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
+  qrPreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
+  input:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginBottom:15, fontSize: 16 },
+  saveBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:25, marginTop:15, alignItems:'center' },
+  saveText:{ fontWeight:'900', color:'#000', textAlign:'center', fontSize: 16 },
+  historyCard:{ backgroundColor:'#18181b', borderLeftWidth:6, borderRadius:15, padding:15, marginVertical:8 },
+  historyHeader:{ flexDirection:'row', justifyContent:'space-between', marginBottom:10 },
+  historyDate:{ color:'#fff', fontWeight:'900', fontSize:12 },
+  historyTotal:{ color:'#f97316', fontWeight:'900', fontSize:14 },
+  historyItem:{ marginBottom:6 },
+  historyItemText:{ color:'#fff', fontSize:12, fontWeight: '700' },
   adminHorizontalCard: { flexDirection: 'row', backgroundColor: '#18181b', borderRadius: 20, padding: 15, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#27272a', marginBottom: 12 },
   cardLeftContent: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   cardSmallThumb: { width: 60, height: 60, borderRadius: 12, backgroundColor: '#000', resizeMode: 'contain' },
@@ -710,6 +719,5 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   actionEdit: { backgroundColor: '#27272a', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f6' },
   actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
-  emptyHistory: { color: '#777', textAlign: 'center', fontStyle: 'italic', marginTop: 30, fontSize: 16 }
+  emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
 });
-
