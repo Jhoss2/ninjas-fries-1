@@ -2,37 +2,37 @@ const SQLite = require('expo-sqlite');
 
 const db = SQLite.openDatabaseSync('ninjas_fries.db');
 
-const Base de données = {
+const Database = {
   /**
-   * Initialiser les tables de la base de données si elles n'existent pas.
+   * Initialise les tables de la base de données si elles n'existent pas.
    */
   init: () => {
     db.execSync(`
-      CRÉER UNE TABLE SI ELLE N'EXISTE PAS produits (
-        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
-        nom TEXTE NON NUL,
-        prix ENTIER NON NUL,
-        image TEXTE,
-        type TEXTE NON NUL
+      CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        image TEXT,
+        type TEXT NOT NULL
       );
-      CRÉER UNE TABLE SI ELLE N'EXISTE PAS paramètres (
-        clé TEXTE CLÉ PRIMAIRE,
-        valeur TEXTE
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
       );
-      CRÉER LA TABLE SI ELLE N'EXISTE PAS commandes (
-        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
-        date TEXTE NON NUL,
-        heure TEXTE NON NUL,
-        éléments TEXTE NON NUL,
-        total ENTIER NON NUL
+      CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        items TEXT NOT NULL,
+        total INTEGER NOT NULL
       );
-      CRÉER LA TABLE SI ELLE N'EXISTE PAS cart_table (
-        id CLÉ PRIMAIRE ENTIÈRE À INCRÉDIT AUTOMATIQUE,
-        productId ENTIER,
-        nom TEXTE NON NUL,
-        quantité ENTIER NON NUL,
-        totalPrice ENTIER NON NUL,
-        texte supplémentaire
+      CREATE TABLE IF NOT EXISTS cart_table (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        productId INTEGER,
+        name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        totalPrice INTEGER NOT NULL,
+        extras TEXT
       );
     `);
   },
@@ -40,14 +40,14 @@ const Base de données = {
   /**
    * Gestion de la couleur du jour.
    */
-  obtenirCouleurDuJour : () => {
-    const aujourd'hui = new Date().toLocaleDateString('fr-FR');
+  getDailyColor: () => {
+    const today = new Date().toLocaleDateString('fr-FR');
     const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [`color_${today}`]);
     
-    si (résultat) {
-      renvoyer result.value;
-    } autre {
-      const couleurs = [
+    if (result) {
+      return result.value;
+    } else {
+      const colors = [
         '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
         '#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1',
         '#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#fb7185',
@@ -56,19 +56,19 @@ const Base de données = {
       ];
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
       db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [`color_${today}`, randomColor]);
-      renvoyer une couleur aléatoire ;
+      return randomColor;
     }
   },
 
   /**
-   * Gestion des paramètres.
+   * Gestion des paramètres (settings).
    */
-  obtenirSetting: (clé) => {
+  getSetting: (key) => {
     const result = db.getFirstSync('SELECT value FROM settings WHERE key = ?', [key]);
-    retourner le résultat ? résultat.value : null;
+    return result ? result.value : null;
   },
 
-  saveSetting: (clé, valeur) => {
+  saveSetting: (key, value) => {
     db.runSync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
   },
 
@@ -79,59 +79,59 @@ const Base de données = {
     return db.getAllSync('SELECT * FROM products WHERE type = ?', [type]);
   },
 
-  enregistrerProduit: (nom, prix, image, type) => {
+  saveProduct: (name, price, image, type) => {
     db.runSync('INSERT INTO products (name, price, image, type) VALUES (?, ?, ?, ?)', [name, price, image, type]);
   },
 
-  mettre à jour le produit : (id, nom, prix, image) => {
+  updateProduct: (id, name, price, image) => {
     db.runSync('UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?', [name, price, image, id]);
   },
 
-  supprimerProduit : (id) => {
-    db.runSync('SUPPRIMER DE produits OÙ id = ?', [id]);
+  deleteProduct: (id) => {
+    db.runSync('DELETE FROM products WHERE id = ?', [id]);
   },
 
   /**
-   * Gestion du PANIER (cart_table) - Requis par le nouveau guide.
+   * Gestion du PANIER (cart_table).
    */
-  ajouterAuPanier: (productId, nom, quantité, prixTotal, extrasJson) => {
+  addToCart: (productId, name, quantity, totalPrice, extrasJson) => {
     db.runSync(
       'INSERT INTO cart_table (productId, name, quantity, totalPrice, extras) VALUES (?, ?, ?, ?, ?)',
-      [productId, nom, quantité, prix total, extrasJson]
+      [productId, name, quantity, totalPrice, extrasJson]
     );
   },
 
   getCartItems: () => {
-    retourner db.getAllSync('SELECT * FROM cart_table');
+    return db.getAllSync('SELECT * FROM cart_table');
   },
 
-  obtenirTotalDuPanier: () => {
+  getCartTotal: () => {
     const result = db.getFirstSync('SELECT SUM(totalPrice) as grandTotal FROM cart_table');
-    retourner le résultat ? résultat.grandTotal || 0 : 0 ;
+    return result ? result.grandTotal || 0 : 0;
   },
 
-  supprimerDuPanier : (id) => {
-    db.runSync('SUPPRIMER DE LA TABLE cart_table OÙ id = ?', [id]);
+  removeFromCart: (id) => {
+    db.runSync('DELETE FROM cart_table WHERE id = ?', [id]);
   },
 
-  effacerPanier: () => {
-    db.runSync('SUPPRIMER DE cart_table');
+  clearCart: () => {
+    db.runSync('DELETE FROM cart_table');
   },
 
   /**
-   * Gestion des commandes.
+   * Gestion des commandes (orders).
    */
-  obtenirCommandes: () => {
+  getOrders: () => {
     return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
   },
 
-  obtenirVentes: () => {
+  getSales: () => {
     return db.getAllSync('SELECT * FROM orders ORDER BY id DESC');
   },
 
-  insérerOrder: (itemsJson, total, date, heure) => {
+  insertOrder: (itemsJson, total, date, time) => {
     db.runSync('INSERT INTO orders (items, total, date, time) VALUES (?, ?, ?, ?)', [itemsJson, total, date, time]);
   }
 };
 
-module.exports = { Base de données };
+module.exports = { Database };
