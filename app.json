@@ -37,8 +37,7 @@
         }
       ],
       "expo-av",
-      "expo-sqlite",
-      "expo-blur"
+      "expo-sqlite"
     ]
   }
 }
