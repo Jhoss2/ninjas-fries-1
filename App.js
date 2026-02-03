@@ -24,10 +24,8 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
-// CONFIGURATION GÉOMÉTRIQUE AJUSTÉE (PRODUIT AGRANDI)
 const CARD_WIDTH = SCREEN_WIDTH * 0.55;
-const SPACING = 0;
-const ITEM_SIZE = CARD_WIDTH + SPACING;
+const ITEM_SIZE = CARD_WIDTH;
 
 const DAILY_COLORS = [
   '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
@@ -101,7 +99,7 @@ const buildEscPosTicket = (order) => {
   ticket += '\x1B\x61\x00'; // left
   order.items.forEach(item => {
     ticket += `${item.quantity}x ${item.name.toUpperCase()}\n`;
-    const extras = item.extras || {};
+    const extras = JSON.parse(item.extras || '{}');
     const sauces = Array.isArray(extras.sauces) ? extras.sauces : [];
     const garnitures = Array.isArray(extras.garnitures) ? extras.garnitures : [];
     sauces.forEach(s => {
@@ -123,7 +121,6 @@ const exportOrdersToCSV = async (orderHistory) => {
     const itemsList = JSON.parse(o.items || '[]');
     const itemsNames = itemsList.map(i => `${i.quantity}x ${i.name.toUpperCase()}`).join(' | ');
     
-    // Enrichissement des données : Sauces et Garnitures avec leurs prix
     const extrasDetails = itemsList.map(i => {
       const extras = JSON.parse(i.extras || '{}');
       const sauces = (extras.sauces || []).map(s => `${s.name.toUpperCase()} (0F)`).join(', ');
@@ -262,17 +259,13 @@ function App() {
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // 1. SPLASH SCREEN ÉCLAIR : Timeout de secours (1.5s)
   useEffect(() => {
     const splashTimeout = setTimeout(() => {
-      if (splashVisible) {
-        setSplashVisible(false);
-      }
+      if (splashVisible) setSplashVisible(false);
     }, 1500); 
     return () => clearTimeout(splashTimeout);
   }, [splashVisible]);
 
-  // 2. INITIALISATION SQLITE SÉCURISÉE
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -299,15 +292,16 @@ function App() {
         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
         if (index !== currentIndex && index >= 0 && index < menuItems.length) {
           setCurrentIndex(index);
-          setQuantity(1);
-          resetExtras();
+          resetControls();
         }
       },
     }
   );
 
   const updateQuantity = (val) => setQuantity((prev) => Math.max(1, prev + val));
-  const resetExtras = () => {
+  
+  const resetControls = () => {
+    setQuantity(1);
     setSelectedExtras({ sauces: [], garnitures: [] });
     setShowSaucePicker(false);
     setShowGarniturePicker(false);
@@ -353,7 +347,7 @@ function App() {
       setOrderHistory(Database.getOrders());
       Database.clearCart();
       setOrderSent(true);
-      
+      resetControls(); // Réinitialisation après validation
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
@@ -379,9 +373,7 @@ function App() {
           shouldPlay={true}
           isLooping={false}
           onPlaybackStatusUpdate={(status) => {
-            if (status.didJustFinish) {
-              setSplashVisible(false);
-            }
+            if (status.didJustFinish) setSplashVisible(false);
           }}
           onError={() => setSplashVisible(false)}
         />
@@ -392,10 +384,7 @@ function App() {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.tablet}>
-        <Pressable style={styles.adminAccess} onPress={() => setShowPassModal(true)}>
-          <Text style={{color: '#f97316', fontSize: 24}}>⚙</Text>
-        </Pressable>
-
+        {/* LOGO EN HAUT SANS ESPACE INUTILE */}
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
             <Image source={{ uri: config.logoUrl }} style={styles.logo} />
@@ -404,6 +393,11 @@ function App() {
           )}
         </View>
 
+        <Pressable style={styles.adminAccess} onPress={() => setShowPassModal(true)}>
+          <Text style={{color: '#f97316', fontSize: 24}}>⚙</Text>
+        </Pressable>
+
+        {/* PRIX SUIT IMMÉDIATEMENT LE LOGO */}
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
             {currentItem ? totalPrice : 0}
@@ -411,6 +405,7 @@ function App() {
           </Text>
         </View>
 
+        {/* CARROUSEL CENTRAL AVEC PLUS D'ESPACE */}
         <View style={styles.carouselContainer}>
           <Animated.ScrollView
             horizontal
@@ -444,39 +439,50 @@ function App() {
           </Animated.ScrollView>
         </View>
 
-        <ScrollView contentContainerStyle={styles.mainScroll} showsVerticalScrollIndicator={false}>
-          <View style={styles.infoSection}>
+        {/* STRUCTURE DE CONTRÔLE RÉVOLUTIONNÉE */}
+        <View style={styles.controlsSection}>
+          {/* LIGNE DE TITRE : [-] NOM [+] */}
+          <View style={styles.titleRow}>
+            <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(-1)}>
+              <Text style={styles.titleQtyBtnText}>-</Text>
+            </Pressable>
             <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
-            <View style={styles.quantityRow}>
-              <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(-1)}><Text style={styles.qtyBtnText}>-</Text></Pressable>
-              <View style={styles.qtyBadge}><Text style={styles.qtyBadgeText}>{quantity}</Text></View>
-              <Pressable style={styles.qtyBtn} onPress={() => updateQuantity(1)}><Text style={styles.qtyBtnText}>+</Text></Pressable>
-            </View>
+            <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(1)}>
+              <Text style={styles.titleQtyBtnText}>+</Text>
+            </Pressable>
           </View>
 
-          <View style={styles.pagination}>
-            {menuItems.map((_, i) => (
-              <View key={i} style={[styles.dot, { width: currentIndex === i ? 24 : 8, backgroundColor: currentIndex === i ? '#f97316' : '#27272a' }]} />
-            ))}
+          {/* LIGNE DES SÉLECTEURS : [SAUCES] (Badge) [GARNITURES] */}
+          <View style={styles.selectorsRow}>
+            <Pressable 
+              style={[styles.selectorBtn, { borderColor: '#f97316' }]} 
+              onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}
+            >
+              <Text style={styles.selectorBtnText}>SAUCES ({selectedExtras.sauces.length})</Text>
+            </Pressable>
+            
+            <View style={styles.qtyBadgeCenter}>
+              <Text style={styles.qtyBadgeText}>{quantity}</Text>
+            </View>
+
+            <Pressable 
+              style={[styles.selectorBtn, { borderColor: '#f97316' }]} 
+              onPress={() => { setShowGarniturePicker(!showGarniturePicker); setShowSaucePicker(false); }}
+            >
+              <Text style={styles.selectorBtnText}>GARNITURES</Text>
+            </Pressable>
           </View>
 
-          {currentItem && (
-            <View style={styles.pickers}>
-              <Pressable style={styles.pickerBtn} onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}>
-                <Text style={styles.pickerText}>SAUCES ({selectedExtras.sauces.length})</Text>
-              </Pressable>
-              <Pressable style={styles.pickerBtnWide} onPress={() => { setShowGarniturePicker(!showGarniturePicker); setShowSaucePicker(false); }}>
-                <Text style={styles.pickerText}>GARNITURES</Text>
-                <IconPlus />
-              </Pressable>
-            </View>
-          )}
-
+          {/* CARROUSEL EXTRAS RÉDUIT */}
           {(showSaucePicker || showGarniturePicker) && (
             <View style={styles.extrasDropdown}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {(showSaucePicker ? sauces : garnitures).map((s) => (
-                  <Pressable key={s.id} onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)} style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}>
+                  <Pressable 
+                    key={s.id} 
+                    onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)} 
+                    style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}
+                  >
                     {s.image ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" /> : <View style={styles.extraImageFallback}><Text style={{fontSize:8, color:'#555'}}>IMAGE</Text></View>}
                     <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
                     {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
@@ -485,9 +491,9 @@ function App() {
               </ScrollView>
             </View>
           )}
-          <View style={{ height: 120 }} /> 
-        </ScrollView>
+        </View>
 
+        {/* BOUTON COMMANDER FIXÉ EN BAS */}
         <Pressable style={styles.orderBtnFixed} onPress={addToCart}>
           <Text style={styles.orderText}>COMMANDER</Text>
         </Pressable>
@@ -637,40 +643,36 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'space-between' },
   splashContainer: { flex: 1, backgroundColor: '#000000' },
-  tablet: { flex: 1, width: '100%', maxWidth: 500, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20 },
-  adminAccess: { position: 'absolute', top: 50, left: 25, zIndex: 100, padding: 10 },
-  logoWrapper: { position: 'absolute', top: 50, alignItems: 'center', width: '100%', zIndex: 20 },
-  logo: { width: 180, height: 100, resizeMode: 'contain' },
+  tablet: { flex: 1, width: '100%', maxWidth: 500, alignItems: 'center', justifyContent: 'flex-start', paddingVertical: 10 },
+  logoWrapper: { width: '100%', alignItems: 'center', zIndex: 20, marginTop: 10 },
+  logo: { width: 150, height: 80, resizeMode: 'contain' },
   brandText: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
-  priceContainer: { height: 100, justifyContent: 'center', alignItems: 'center', zIndex: 10, marginTop: 130 },
-  price: { fontSize: 72, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15 },
-  priceUnit: { fontSize: 24, color: '#f97316' },
-  carouselContainer: { height: SCREEN_HEIGHT * 0.35, width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
+  adminAccess: { position: 'absolute', top: 20, left: 25, zIndex: 100, padding: 10 },
+  priceContainer: { height: 80, justifyContent: 'center', alignItems: 'center', zIndex: 10, marginTop: -10 },
+  price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15 },
+  priceUnit: { fontSize: 20, color: '#f97316' },
+  carouselContainer: { height: SCREEN_HEIGHT * 0.32, width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
   card: { width: CARD_WIDTH, height: CARD_WIDTH, justifyContent: 'center', alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 30 },
   itemImage: { width: '100%', height: '100%' },
-  mainScroll: { width: '100%', alignItems: 'center' },
-  infoSection: { alignItems: 'center', marginTop: 10 },
-  itemNameText: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', fontStyle: 'italic', textAlign: 'center', textTransform: 'uppercase', marginBottom: 10, letterSpacing: -1 },
-  quantityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginTop: 5 },
-  qtyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#18181b', borderWidth: 1, borderColor: '#27272a', alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: '#f97316', fontSize: 20, fontWeight: 'bold' },
-  qtyBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
-  qtyBadgeText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  pagination: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 15 },
-  dot: { height: 8, borderRadius: 4 },
-  pickers: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15, paddingHorizontal: 30, gap: 10 },
-  pickerBtn: { flex: 1, height: 45, borderWidth: 1, borderColor: '#f97316', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-  pickerBtnWide: { flex: 1.2, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#f97316', paddingHorizontal: 15, borderRadius: 30 },
-  pickerText: { color: '#fff', fontWeight: '900', fontSize: 12, fontStyle: 'italic' },
-  extrasDropdown: { marginTop: 10, paddingHorizontal: 20 },
-  extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 100 },
+  controlsSection: { width: '100%', paddingHorizontal: 20, marginTop: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 15 },
+  titleQtyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#000', borderWidth: 1, borderColor: '#555', alignItems: 'center', justifyContent: 'center' },
+  titleQtyBtnText: { color: '#f97316', fontSize: 24, fontWeight: 'bold' },
+  itemNameText: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', fontStyle: 'italic', textAlign: 'center', textTransform: 'uppercase', flex: 1 },
+  selectorsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 10 },
+  selectorBtn: { flex: 1, height: 45, borderWidth: 1, borderRadius: 30, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
+  selectorBtnText: { color: '#fff', fontWeight: '900', fontSize: 12, fontStyle: 'italic' },
+  qtyBadgeCenter: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
+  qtyBadgeText: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  extrasDropdown: { marginTop: 10, width: '100%' },
+  extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 80, height: 100 },
   extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
-  extraItemText: { color: '#fff', fontSize: 11, textAlign: 'center', fontWeight: '900', marginTop: 5 },
-  extraImageSmall: { width: 60, height: 60, shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
-  extraImageFallback: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
-  extraPriceText: { color: '#f97316', fontSize: 10, fontWeight: '900' },
-  orderBtnFixed: { position: 'absolute', bottom: 40, backgroundColor: '#f97316', width: '90%', padding: 20, borderRadius: 50, alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10, alignSelf: 'center' },
-  orderText: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },
+  extraItemText: { color: '#fff', fontSize: 10, textAlign: 'center', fontWeight: '900', marginTop: 5 },
+  extraImageSmall: { width: 50, height: 50, shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  extraImageFallback: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
+  extraPriceText: { color: '#f97316', fontSize: 9, fontWeight: '900' },
+  orderBtnFixed: { position: 'absolute', bottom: 20, backgroundColor: '#f97316', width: '90%', padding: 18, borderRadius: 50, alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10, alignSelf: 'center' },
+  orderText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },
   overlay: { flex: 1, backgroundColor: '#000' },
   container: { flex: 1 },
   closeButton: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 25, marginRight: 20, marginTop: 10 },
@@ -751,3 +753,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
+
