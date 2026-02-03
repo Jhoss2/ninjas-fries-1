@@ -25,7 +25,7 @@ const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
 // --- CONFIGURATION GÉOMÉTRIQUE AJUSTÉE (PRODUIT AGRANDI) ---
-// On augmente la largeur de base de la carte puisque le texte est supprimé
+// On augmente la largeur de base de la carte (0.55) pour l'effet Vanta Black
 const CARD_WIDTH = SCREEN_WIDTH * 0.55; 
 const SPACING = 0;
 const ITEM_SIZE = CARD_WIDTH + SPACING;
@@ -39,7 +39,7 @@ const DAILY_COLORS = [
   '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
 ];
 
-/* ===================== ICÔNES ===================== */
+/*  ICÔNES ===================== */
 const IconPlus = () => (
   <Svg width={20} height={20} viewBox="0 0 24 24">
     <Line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="3" />
@@ -350,12 +350,14 @@ function App() {
     }
   };
 
+    // --- LOGIQUE DU PANIER ---
   const addToCart = () => {
     if (!currentItem) return;
     Database.addToCart(currentItem.id, currentItem.name, quantity, totalPrice, JSON.stringify(selectedExtras));
     setView('checkout');
   };
 
+  // --- RENDU DU SPLASH SCREEN (VIDÉO) ---
   if (splashVisible) {
     return (
       <View style={styles.splashContainer}>
@@ -365,7 +367,6 @@ function App() {
           resizeMode={ResizeMode.COVER}
           shouldPlay={true}
           isLooping={false}
-          shouldRasterizeIOS={true} 
           onPlaybackStatusUpdate={(status) => {
             if (status.didJustFinish) {
               setSplashVisible(false);
@@ -377,36 +378,100 @@ function App() {
     );
   }
 
+  // --- RENDU DU MENU PRINCIPAL ---
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.tablet}>
+        
+        {/* BOUTON ACCÈS ADMIN */}
         <Pressable style={styles.adminAccess} onPress={() => setShowPassModal(true)}>
-          <IconChevronRight size={20} />
+          <Text style={{color: '#f97316', fontSize: 18}}>⚙</Text>
         </Pressable>
 
+        {/* LOGO */}
         <View style={styles.logoWrapper}>
-          {config.logoUrl ? (
-            <Image source={{ uri: config.logoUrl }} style={styles.logo} resizeMode="contain" />
-          ) : (
-            <Text style={styles.brandText}>NINJA <Text style={{color: '#f97316'}}>FRIES</Text></Text>
-          )}
+          <Text style={styles.brandText}>NINJA <Text style={{color: '#f97316'}}>FRIES</Text></Text>
         </View>
 
+        {/* PRIX FIXE (HAUT) */}
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
-            {currentItem ? totalPrice : 0}
+            {currentItem ? currentItem.price : 0}
             <Text style={styles.priceUnit}> FCFA</Text>
           </Text>
         </View>
 
+        {/* SECTION CARROUSEL (IMAGES NUES) */}
         <View style={styles.carouselContainer}>
-        
-              {/* SECTION CARROUSEL */}
-      <View style={styles.carouselContainer}>
-        
-        {/* MASQUES DE BORDURE (EFFET DÉBORDEMENT) */}
-        <View style={[styles.fadeEdge, { left: 0 }]} />
-        <View style={[styles.fadeEdge, { right: 0 }]} />
+          {/* MASQUES DE BORDURE (EFFET DÉBORDEMENT) */}
+          <View style={[styles.fadeEdge, { left: 0 }]} />
+          <View style={[styles.fadeEdge, { right: 0 }]} />
+
+          <Animated.ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={ITEM_SIZE} 
+            decelerationRate="fast"
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true }
+            )}
+            contentContainerStyle={{ 
+              paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2,
+              alignItems: 'center' 
+            }}
+          >
+            {menuItems.map((item, index) => {
+              const inputRange = [
+                (index - 1) * ITEM_SIZE,
+                index * ITEM_SIZE,
+                (index + 1) * ITEM_SIZE,
+              ];
+
+              const scale = scrollX.interpolate({
+                inputRange,
+                outputRange: [0.4, 1.25, 0.4],
+                extrapolate: 'clamp',
+              });
+
+              const opacity = scrollX.interpolate({
+                inputRange,
+                outputRange: [0.3, 1, 0.3],
+                extrapolate: 'clamp',
+              });
+
+              return (
+                <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center' }}>
+                  <Animated.View style={[
+                    styles.card, 
+                    { transform: [{ scale }], opacity }
+                  ]}>
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.itemImage}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                </View>
+              );
+            })}
+          </Animated.ScrollView>
+        </View>
+
+        {/* NOM DU PRODUIT FIXE (BAS) */}
+        <View style={styles.bottomInfoSection}>
+          <Text style={styles.itemNameText}>
+            {currentItem.name || ""}
+          </Text>
+          <Pressable style={styles.orderButton} onPress={addToCart}>
+            <Text style={styles.orderButtonText}>COMMANDER</Text>
+          </Pressable>
+        </View>
+
+      </View>
+    </SafeAreaView>
+  );
 
         <Animated.ScrollView
           horizontal
@@ -462,7 +527,7 @@ function App() {
           })}
         </Animated.ScrollView>
       </View>
-
+          
         <View style={styles.infoSection}>
           <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
           <View style={styles.quantityRow}>
@@ -703,26 +768,6 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
     alignItems: 'center', 
     marginBottom: 20 
   },
-  itemNameText: { 
-    color: '#FFF', 
-    fontWeight: '900', 
-    fontSize: 42, 
-    fontStyle: 'italic', 
-    textAlign: 'center',
-    textTransform: 'uppercase'
-  },
-
-  // PRIX DYNAMIQUE
-  priceContainer: { 
-    alignItems: 'center', 
-    marginTop: 10 
-  },
-  price: { 
-    fontSize: 72, 
-    fontWeight: '900', 
-    color: '#f97316', 
-    fontStyle: 'italic' 
-  },
   priceUnit: { 
     fontSize: 24 
   },
@@ -791,4 +836,24 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
   historyTotal: { color: '#f97316', fontWeight: '900', fontSize: 14 },
   historyItemText: { color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 4 }
 });
+  itemNameText: { 
+    color: '#FFF', 
+    fontWeight: '900', 
+    fontSize: 42, 
+    fontStyle: 'italic', 
+    textAlign: 'center',
+    textTransform: 'uppercase'
+  },
+
+  // PRIX DYNAMIQUE
+  priceContainer: { 
+    alignItems: 'center', 
+    marginTop: 10 
+  },
+  price: { 
+    fontSize: 72, 
+    fontWeight: '900', 
+    color: '#f97316', 
+    fontStyle: 'italic' 
+  },
 module.exports = App;
