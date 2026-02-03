@@ -716,174 +716,310 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
 };
 
     
-    const styles = StyleSheet.create({
-  // FOND DE L'APPLICATION (VANTA BLACK)
-  root: {
-    flex: 1,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    const React = require('react');
+const { useState, useEffect, useRef } = React;
+const {
+  View, Text, Image, Pressable, TextInput, 
+  Modal, StyleSheet, Alert, Animated, SafeAreaView, Dimensions
+} = require('react-native');
+const { Video, ResizeMode } = require('expo-av');
+
+// IMPORT POUR LA PERSISTANCE
+const { Database } = require('./Database');
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// --- CONFIGURATION GÉOMÉTRIQUE ---
+const CARD_WIDTH = SCREEN_WIDTH * 0.6; 
+const ITEM_SIZE = CARD_WIDTH; 
+
+const App = () => {
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [menuItems, setMenuItems] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0); 
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef(null);
+
+  useEffect(() => {
+    Database.init();
+    const products = Database.getProducts('NINJA FRIES');
+    setMenuItems(products);
+  }, []);
+
+  useEffect(() => {
+    const listenerId = scrollX.addListener(({ value }) => {
+      const index = Math.round(value / ITEM_SIZE);
+      if (index !== currentIndex && index >= 0 && index < menuItems.length) {
+        setCurrentIndex(index);
+      }
+    });
+    return () => scrollX.removeListener(listenerId);
+  }, [currentIndex, menuItems.length]);
+
+  const currentItem = menuItems[currentIndex] || {};
+
+  if (splashVisible) {
+    return (
+      <View style={styles.splashContainer}>
+        <Video
+          source={require('./assets/lv_0_20260201104716.mp4')}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={true}
+          onPlaybackStatusUpdate={(status) => {
+            if (status.didJustFinish) setSplashVisible(false);
+          }}
+          onError={() => setSplashVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.root}>
+      {/* LOGO FIXE EN HAUT */}
+      <View style={styles.logoWrapper}>
+        <Image source={require('./assets/logo.png')} style={styles.logo} />
+      </View>
+
+      <Pressable style={styles.adminAccess} onPress={() => setShowPassModal(true)}>
+        <Text style={{color: '#f97316', fontSize: 24, opacity: 0.3}}>⚙</Text>
+      </Pressable>
+
+      {/* PRIX FIXE */}
+      <View style={styles.priceContainer}>
+        <Text style={styles.price}>
+          {currentItem.price || 0}
+          <Text style={styles.priceUnit}> F</Text>
+        </Text>
+      </View>
+
+      {/* CARROUSEL CENTRAL */}
+      <View style={styles.carouselContainer}>
+        {/* MASQUES LATÉRAUX POUR EFFET ESTOMPÉ */}
+        <View style={[styles.fadeEdge, { left: 0 }]} />
+        <View style={[styles.fadeEdge, { right: 0 }]} />
+
+        <Animated.ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={ITEM_SIZE}
+          decelerationRate="fast"
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true }
+          )}
+          contentContainerStyle={{
+            paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2,
+            alignItems: 'center'
+          }}
+        >
+          {menuItems.map((item, index) => {
+            const inputRange = [(index - 1) * ITEM_SIZE, index * ITEM_SIZE, (index + 1) * ITEM_SIZE];
+            const scale = scrollX.interpolate({ inputRange, outputRange: [0.4, 1.2, 0.4], extrapolate: 'clamp' });
+            const opacity = scrollX.interpolate({ inputRange, outputRange: [0.2, 1, 0.2], extrapolate: 'clamp' });
+
+            return (
+              <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center' }}>
+                <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
+                  <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="contain" />
+                </Animated.View>
+              </View>
+            );
+          })}
+        </Animated.ScrollView>
+      </View>
+
+      {/* INFOS BAS (FIXE) */}
+      <View style={styles.bottomSection}>
+        <Text style={styles.itemNameText}>{currentItem.name || ""}</Text>
+        <Pressable style={styles.orderButton} onPress={() => Alert.alert("Panier", `${currentItem.name} ajouté`)}>
+          <Text style={styles.orderButtonText}>COMMANDER</Text>
+        </Pressable>
+      </View>
+
+      {/* MODALE ADMIN */}
+      <Modal visible={showPassModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.passBox}>
+            <Text style={styles.modalTitle}>ADMINISTRATION</Text>
+            <TextInput
+              style={styles.passInput}
+              placeholder="CODE"
+              placeholderTextColor="#444"
+              secureTextEntry
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+            />
+            <View style={styles.modalActions}>
+               <Pressable style={[styles.orderButton, {backgroundColor: '#333', flex: 1, marginRight: 10}]} onPress={() => setShowPassModal(false)}>
+                <Text style={styles.orderButtonText}>ANNULER</Text>
+              </Pressable>
+              <Pressable style={[styles.orderButton, {flex: 1}]} onPress={() => { if(passwordInput === '1234') setShowPassModal(false); }}>
+                <Text style={styles.orderButtonText}>VALIDER</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  // CONFIGURATION RACINE
+  root: { 
+    flex: 1, 
+    backgroundColor: '#000000', 
+    justifyContent: 'space-between' 
+  },
+  splashContainer: { 
+    flex: 1, 
+    backgroundColor: '#000000' 
+  },
+  
+  // LOGO (POSITION ABSOLUE POUR NE PAS POUSSER LE RESTE)
+  logoWrapper: { 
+    position: 'absolute', 
+    top: 40, 
+    width: '100%', 
+    alignItems: 'center', 
+    zIndex: 50 
+  },
+  logo: { 
+    width: 200, 
+    height: 100, 
+    resizeMode: 'contain' 
+  },
+  adminAccess: { 
+    position: 'absolute', 
+    top: 40, 
+    left: 20, 
+    zIndex: 60, 
+    padding: 10 
   },
 
-  // SPLASH SCREEN NOIR
-  splashContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
+  // PRIX (EN HAUT SOUS LE LOGO)
+  priceContainer: { 
+    marginTop: 140, 
+    alignItems: 'center' 
   },
-
-  // CONTENEUR TABLET / MOBILE
-  tablet: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 500,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 40,
-  },
-
-  // 1. SECTION PRIX (HAUT FIXE)
-  priceContainer: {
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    marginTop: 80, // Espace pour laisser place au logo au-dessus
-  },
-  price: {
-    fontSize: 72,
-    fontWeight: '900',
-    color: '#f97316',
+  price: { 
+    fontSize: 80, 
+    fontWeight: '900', 
+    color: '#f97316', 
     fontStyle: 'italic',
-    textShadowColor: 'rgba(249, 115, 22, 0.4)',
+    textShadowColor: 'rgba(249,115,22,0.3)',
     textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 15,
+    textShadowRadius: 10
   },
-  priceUnit: {
-    fontSize: 24,
-    color: '#f97316',
+  priceUnit: { 
+    fontSize: 26 
   },
 
-  // 2. SECTION CARROUSEL (CENTRE)
-  carouselContainer: {
+  // CARROUSEL (CENTRE)
+  carouselContainer: { 
     height: SCREEN_HEIGHT * 0.45,
-    width: SCREEN_WIDTH,
     justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'visible',
+    position: 'relative'
   },
-  card: {
-    width: CARD_WIDTH,
+  card: { 
+    width: CARD_WIDTH, 
     height: CARD_WIDTH,
-    justifyContent: 'center',
-    alignItems: 'center',
     shadowColor: '#f97316',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.5,
+    shadowRadius: 25,
   },
-  itemImage: {
-    width: '100%',
-    height: '100%',
+  itemImage: { 
+    width: '100%', 
+    height: '100%' 
   },
-
-  // MASQUES DE BORDURE (EFFET ESTOMPÉ)
   fadeEdge: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
     width: SCREEN_WIDTH * 0.2,
-    backgroundColor: '#000000',
-    opacity: 0.8,
-    zIndex: 5,
-  },
-
-  // 3. SECTION NOM ET BOUTON (BAS FIXE)
-  bottomInfoSection: {
-    width: '100%',
-    alignItems: 'center',
-    paddingBottom: 20,
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     zIndex: 10,
+    pointerEvents: 'none'
   },
-  itemNameText: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: '900',
-    fontStyle: 'italic',
+
+  // INFOS PRODUIT ET BOUTON (BAS)
+  bottomSection: { 
+    alignItems: 'center', 
+    paddingBottom: 50,
+    width: '100%'
+  },
+  itemNameText: { 
+    color: '#FFF', 
+    fontSize: 42, 
+    fontWeight: '900', 
+    fontStyle: 'italic', 
+    marginBottom: 25, 
     textAlign: 'center',
-    textTransform: 'uppercase',
-    marginBottom: 30,
-    letterSpacing: -1,
+    textTransform: 'uppercase'
   },
-  orderButton: {
-    backgroundColor: '#f97316',
-    paddingVertical: 20,
-    paddingHorizontal: 60,
+  orderButton: { 
+    backgroundColor: '#f97316', 
+    paddingVertical: 20, 
+    paddingHorizontal: 60, 
     borderRadius: 50,
-    shadowColor: '#f97316',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  orderButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    letterSpacing: 1,
-  },
-
-  // --- CONFIGURATION LOGO (AJUSTABLE) ---
-  logoWrapper: {
-    position: 'absolute',
-    top: 50,
-    alignItems: 'center',
-    width: '100%',
-    zIndex: 20,
-  },
-  logo: {
-    width: 180,  // TAILLE : Modifie ce chiffre pour la largeur
-    height: 100,  // TAILLE : Modifie ce chiffre pour la hauteur
-    resizeMode: 'contain',
-  },
-  brandText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-    fontStyle: 'italic',
-  },
-  adminAccess: {
-    position: 'absolute',
-    top: 50,
-    left: 25,
-    zIndex: 100,
-    padding: 10,
-  },
-
-  // MODALE ADMIN
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
+    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
-  passBox: {
-    width: '85%',
-    backgroundColor: '#18181b',
-    padding: 30,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: '#27272a',
+  orderButtonText: { 
+    color: '#FFF', 
+    fontWeight: '900', 
+    fontSize: 20, 
+    fontStyle: 'italic' 
   },
-  passInput: {
-    backgroundColor: '#000',
+
+  // MODALE ADMINISTRATION
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.95)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  passBox: { 
+    width: '85%', 
+    backgroundColor: '#111', 
+    padding: 30, 
+    borderRadius: 30, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#222' 
+  },
+  modalTitle: {
     color: '#f97316',
-    padding: 20,
-    borderRadius: 15,
-    fontSize: 24,
-    textAlign: 'center',
-    marginVertical: 20,
     fontWeight: '900',
+    fontSize: 18,
+    marginBottom: 20,
+    fontStyle: 'italic'
+  },
+  passInput: { 
+    backgroundColor: '#000', 
+    color: '#f97316', 
+    width: '100%', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 20, 
+    textAlign: 'center', 
+    fontSize: 24, 
+    fontWeight: '900',
+    borderWidth: 1,
+    borderColor: '#333'
+  },
+  modalActions: {
+    flexDirection: 'row',
+    width: '100%'
   }
 });
+
 export default App;
