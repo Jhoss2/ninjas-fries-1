@@ -1,3 +1,4 @@
+
 const SQLite = require('expo-sqlite');
 
 const db = SQLite.openDatabaseSync('ninjas_fries.db');
