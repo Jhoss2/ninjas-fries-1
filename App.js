@@ -24,13 +24,12 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
-// --- CONFIGURATION GÉOMÉTRIQUE CARROUSEL NINJA ---
-// La carte centrale occupe 40% de la largeur écran
-const CARD_WIDTH = SCREEN_WIDTH * 0.4; 
-// Espacement réduit pour forcer les voisins à déborder de 50%
-const SPACING = 10;
+// --- CONFIGURATION GÉOMÉTRIQUE AJUSTÉE (PRODUIT AGRANDI) ---
+// On augmente la largeur de base de la carte puisque le texte est supprimé
+const CARD_WIDTH = SCREEN_WIDTH * 0.55; 
+const SPACING = 0;
 const ITEM_SIZE = CARD_WIDTH + SPACING;
-// -------------------------------------------------
+// -----------------------------------------------------------
 
 const DAILY_COLORS = [
   '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
@@ -402,14 +401,17 @@ function App() {
 
         <View style={styles.carouselContainer}>
         
-        {/* MASQUES DE BORDURE (EFFET DÉBORDEMENT 50%) */}
+              {/* SECTION CARROUSEL */}
+      <View style={styles.carouselContainer}>
+        
+        {/* MASQUES DE BORDURE (EFFET DÉBORDEMENT) */}
         <View style={[styles.fadeEdge, { left: 0 }]} />
         <View style={[styles.fadeEdge, { right: 0 }]} />
 
         <Animated.ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          snapToInterval={ITEM_SIZE} // Aimantage précis sur la taille de l'item
+          snapToInterval={ITEM_SIZE} 
           decelerationRate="fast"
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -417,7 +419,7 @@ function App() {
             { useNativeDriver: true }
           )}
           contentContainerStyle={{ 
-            paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2, // Centrage parfait du premier item
+            paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2,
             alignItems: 'center' 
           }}
         >
@@ -428,14 +430,14 @@ function App() {
               (index + 1) * ITEM_SIZE,
             ];
 
-            // ÉCHELLE : 1 au centre, 0.4 sur les côtés (Ratio Ninja)
+            // ÉCHELLE : 1.25 au centre pour agrandir le plat, 0.4 sur les côtés
             const scale = scrollX.interpolate({
               inputRange,
-              outputRange: [0.4, 1, 0.4],
+              outputRange: [0.4, 1.25, 0.4],
               extrapolate: 'clamp',
             });
 
-            // OPACITÉ : Très sombre sur les côtés pour le focus
+            // OPACITÉ : Focus total sur l'élément central
             const opacity = scrollX.interpolate({
               inputRange,
               outputRange: [0.3, 1, 0.3],
@@ -448,15 +450,12 @@ function App() {
                   styles.card, 
                   { transform: [{ scale }], opacity }
                 ]}>
+                  {/* IMAGE SEULE : Le titre et le prix sous l'image ont été supprimés */}
                   <Image
                     source={{ uri: item.image }}
                     style={styles.itemImage}
                     resizeMode="contain"
                   />
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle}>{item.name}</Text>
-                    <Text style={styles.cardPrice}>{item.price} F</Text>
-                  </View>
                 </Animated.View>
               </View>
             );
@@ -651,125 +650,145 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
   );
 };
 
-const styles = StyleSheet.create({
-  splashContainer: { flex: 1, backgroundColor: '#000' },
-  root: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  tablet: { width: 390, height: 780, backgroundColor: '#09090b', borderRadius: 48, overflow: 'hidden', paddingVertical: 20 },
-  adminAccess: { position: 'absolute', top: 30, left: 20, zIndex: 50 },
-  logoWrapper: { alignItems: 'center', marginBottom: 10, backgroundColor: 'transparent' },
-  logo: { width: 120, height: 60, backgroundColor: 'transparent' },
-  brandText: { color: '#FFF', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
-  priceContainer: { alignItems: 'center', height: 80 },
-  price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic' },
-  priceUnit: { fontSize: 22 },
+  const styles = StyleSheet.create({
+  // STRUCTURE RACINE
+  root: { 
+    flex: 1, 
+    backgroundColor: '#000', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingVertical: 20 
+  },
 
-  // --- AJUSTEMENTS CARROUSEL NINJA ---
-  carouselContainer: { height: 350, justifyContent: 'center', overflow: 'visible', width: SCREEN_WIDTH },
-  fadeEdge: { position: 'absolute', top: 0, bottom: 0, width: SCREEN_WIDTH * 0.25, backgroundColor: 'transparent', zIndex: 10 },
-  card: { width: CARD_WIDTH, height: 300, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
-  cardInfo: { alignItems: 'center', marginTop: 10 },
-  cardTitle: { color: '#fff', fontSize: 16, fontWeight: '900', fontStyle: 'italic', textAlign: 'center' },
-  cardPrice: { color: '#f97316', fontSize: 18, fontWeight: '900', marginTop: 5 },
+  // ZONE CARROUSEL : Hauteur optimisée pour le zoom 1.25x
+  carouselContainer: { 
+    height: SCREEN_HEIGHT * 0.52, 
+    justifyContent: 'center', 
+    overflow: 'visible', 
+    width: SCREEN_WIDTH 
+  },
+
+  // MASQUES LATERAUX : Effet de focus progressif
+  fadeEdge: { 
+    position: 'absolute', 
+    top: 0, 
+    bottom: 0, 
+    width: SCREEN_WIDTH * 0.2, 
+    backgroundColor: 'transparent', 
+    zIndex: 10 
+  },
+
+  // LA CARTE : Uniquement un support pour l'image (plus de texte)
+  card: { 
+    width: CARD_WIDTH, 
+    height: CARD_WIDTH, 
+    backgroundColor: 'transparent', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+
+  // L'IMAGE : Agrandie avec Glow (Ombre portée intense)
+  itemImage: { 
+    width: CARD_WIDTH, 
+    height: CARD_WIDTH, 
+    shadowColor: "#f97316", 
+    shadowOffset: { width: 0, height: 30 }, 
+    shadowOpacity: 0.7, 
+    shadowRadius: 40, 
+    backgroundColor: 'transparent' 
+  },
+
+  // INFOS PRODUIT : Déportées sous le carrousel
+  infoSection: { 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  itemNameText: { 
+    color: '#FFF', 
+    fontWeight: '900', 
+    fontSize: 42, 
+    fontStyle: 'italic', 
+    textAlign: 'center',
+    textTransform: 'uppercase'
+  },
+
+  // PRIX DYNAMIQUE
+  priceContainer: { 
+    alignItems: 'center', 
+    marginTop: 10 
+  },
+  price: { 
+    fontSize: 72, 
+    fontWeight: '900', 
+    color: '#f97316', 
+    fontStyle: 'italic' 
+  },
+  priceUnit: { 
+    fontSize: 24 
+  },
+
+  // BOUTON DE COMMANDE PREMIUM
+  orderBtn: { 
+    backgroundColor: '#f97316', 
+    padding: 22, 
+    borderRadius: 40, 
+    width: SCREEN_WIDTH * 0.85, 
+    alignItems: 'center', 
+    marginBottom: 40,
+    shadowColor: "#f97316",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 25,
+    elevation: 10
+  },
+  orderText: { 
+    color: '#fff', 
+    fontWeight: '900', 
+    fontSize: 20, 
+    letterSpacing: 1.5, 
+    fontStyle: 'italic' 
+  },
+
+  // SECTION ADMIN / HISTORIQUE (RESTAURÉ)
+  adminBtn: { position: 'absolute', top: 50, left: 20, zIndex: 100 },
+  historyBtn: { position: 'absolute', top: 50, right: 20, zIndex: 100 },
+  adminIconText: { fontSize: 24 },
+
+  // MODALES & INPUTS
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  adminPanel: { width: '90%', backgroundColor: '#09090b', borderRadius: 30, padding: 25, borderWeight: 1, borderColor: '#27272a' },
+  formTitle: { color: '#f97316', fontWeight: '900', fontSize: 24, fontStyle: 'italic', marginBottom: 20, textAlign: 'center' },
+  input: { backgroundColor: '#18181b', color: '#fff', padding: 15, borderRadius: 15, marginBottom: 15, fontWeight: '700' },
   
-  swipeItem: { width: SCREEN_WIDTH * 0.8, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
-  itemImage: { width: 220, height: 220, shadowColor: "#f97316", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 30, backgroundColor: 'transparent' },
-  infoSection: { alignItems: 'center', marginTop: 10 },
-  itemNameText: { color: '#f97316', fontWeight: '900', fontSize: 34, fontStyle: 'italic', textAlign: 'center' },
-  quantityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 15 },
-  qtyBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#18181b', borderWidth: 1, borderColor: '#27272a', alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: '#f97316', fontSize: 24, fontWeight: 'bold' },
-  qtyBadgeText: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  pagination: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 20 },
-  dot: { height: 8, borderRadius: 4 },
-  pickers: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 30 },
-  pickerBtn: { flex: 1, height: 45, borderWidth: 1, borderColor: '#fff', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-  pickerBtnWide: { flex: 1.2, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#fff', paddingHorizontal: 15, borderRadius: 30, marginLeft: 10 },
-  pickerText: { color: '#fff', fontWeight: '900', fontSize: 12, fontStyle: 'italic' },
-  extrasDropdown: { marginTop: 15, paddingHorizontal: 20 },
-  extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 100, overflow: 'visible' },
-  extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
-  extraItemText: { color: '#fff', fontSize: 11, textAlign: 'center', fontWeight: '900', marginTop: 5 },
-  extraImageSmall: { width: 60, height: 60, shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, backgroundColor: 'transparent' },
-  extraImageFallback: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
-  extraPriceText: { color: '#f97316', fontSize: 10, fontWeight: '900' },
-  orderBtn: { backgroundColor: '#f97316', padding: 20, borderRadius: 30, marginHorizontal: 40, marginTop: 20, alignItems: 'center' },
-  orderText: { color: '#fff', fontWeight: '900', fontSize: 18, letterSpacing: 1, fontStyle: 'italic' },
-  overlay: { flex: 1, backgroundColor: '#000' },
-  container: { flex: 1 },
-  closeButton: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 25, marginRight: 20, marginTop: 10 },
-  scrollContent: { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 40 },
-  headerSection: { width: '100%', marginVertical: 30, alignItems: 'center' },
-  checkoutTitleText: { color: '#f97316', fontSize: 22, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },
-  headerSeparator: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', width: '100%', marginTop: 15 },
-  itemsList: { width: '100%', marginBottom: 25 },
-  itemRow: { marginBottom: 15, width: '100%' },
-  itemMainLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, marginRight: 15 },
-  itemNameContainer: { flexDirection: 'row' },
-  orangeText: { color: '#f97316', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  whiteText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  itemPrice: { color: '#f97316', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  removeRowButton: { backgroundColor: 'rgba(255, 255, 255, 0.15)', padding: 8, borderRadius: 20 },
-  extrasContainer: { marginTop: 6, paddingLeft: 10 },
-  extraDetailText: { color: '#FFFFFF', fontSize: 13, fontStyle: 'italic' },
-  orangeExtraValue: { color: '#f97316' },
-  separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: 12 },
-  whiteCard: { backgroundColor: '#FFFFFF', width: SCREEN_WIDTH * 0.85, borderRadius: 35, padding: 25, alignItems: 'center', marginBottom: 30 },
-  qrWrapper: { width: 140, height: 140, backgroundColor: '#f0f0f0', borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 18 },
-  qrImage: { width: '100%', height: '100%' },
-  totalSection: { alignItems: 'center' },
-  totalLabel: { color: '#888888', fontSize: 13, fontWeight: '700' },
-  totalValue: { color: '#f97316', fontSize: 32, fontWeight: '900', fontStyle: 'italic' },
-  confirmButton: { backgroundColor: '#f97316', width: '100%', padding: 20, borderRadius: 50, alignItems: 'center' },
-  confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1.5 },
-  successScreen: { ...StyleSheet.absoluteFillObject, backgroundColor: '#f97316', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-  successIconContainer: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
-  successTitle: { fontSize: 32, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
-  successSubtitle: { fontSize: 14, fontWeight: '900', color: '#fff', marginTop: 10 },
-  modal:{ flex:1, backgroundColor:'rgba(0,0,0,0.9)', justifyContent:'center', padding:20 },
-  passBox:{ backgroundColor:'#18181b', padding:35, borderRadius:45, alignItems: 'center' },
-  passInput:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginVertical:25, textAlign:'center', width: '100%', fontSize: 18, fontWeight:'900', fontStyle: 'italic' },
-  passActions:{ flexDirection:'row', gap:15 },
-  cancelBtn:{ flex:1, backgroundColor:'#27272a', padding:16, borderRadius:25, alignItems:'center' },
-  confirmBtn:{ flex:1, backgroundColor:'#f97316', padding:16, borderRadius:25, alignItems:'center' },
-  adminRoot:{ ...StyleSheet.absoluteFillObject, backgroundColor:'#09090b', zIndex:100 },
-  adminContainer:{ padding:25, gap:25 },
-  adminHeader:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
-  adminTitle:{ color:'#f97316', fontWeight:'900', fontSize:22, fontStyle: 'italic' },
-  iconBtn:{ padding:10 },
-  adminMenu:{ gap:15, marginTop:25 },
-  adminBtn:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', backgroundColor:'#18181b', padding:18, borderRadius:25 },
-  adminBtnText:{ color:'#fff', fontWeight:'900', fontSize:14, fontStyle: 'italic' },
-  exportBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:25, marginTop:15, alignItems:'center' },
-  exportText:{ color:'#000', fontWeight:'900', fontSize:14 },
-  adminFormWrapper:{ marginTop:25 },
-  backBtn:{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:15 },
-  backText:{ color:'#777', fontWeight:'900', fontSize: 16 },
-  formCard:{ backgroundColor:'#18181b', padding:25, borderRadius:30 },
-  formTitle:{ color:'#f97316', fontWeight:'900', fontSize:16, marginBottom:15, fontStyle: 'italic' },
-  imagePicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
-  imagePreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
-  logoPicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
-  logoPreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
-  qrPicker:{ width:100, height:100, borderRadius:20, backgroundColor:'#27272a', justifyContent:'center', alignItems:'center', marginBottom:15 },
-  qrPreview:{ width:100, height:100, borderRadius:20, resizeMode:'contain' },
-  input:{ backgroundColor:'#27272a', color:'#fff', padding:16, borderRadius:25, marginBottom:15, fontSize: 16 },
-  saveBtn:{ backgroundColor:'#f97316', padding:18, borderRadius:25, marginTop:15, alignItems:'center' },
-  saveText:{ fontWeight:'900', color:'#000', textAlign:'center', fontSize: 16 },
-  historyCard:{ backgroundColor:'#18181b', borderLeftWidth:6, borderRadius:15, padding:15, marginVertical:8 },
-  historyHeader:{ flexDirection:'row', justifyContent:'space-between', marginBottom:10 },
-  historyDate:{ color:'#fff', fontWeight:'900', fontSize:12 },
-  historyTotal:{ color:'#f97316', fontWeight:'900', fontSize:14 },
-  historyItem:{ marginBottom:6 },
-  historyItemText:{ color:'#fff', fontSize:12, fontWeight: '700' },
-  adminHorizontalCard: { flexDirection: 'row', backgroundColor: '#18181b', borderRadius: 20, padding: 15, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#27272a', marginBottom: 12 },
+  saveBtn: { backgroundColor: '#f97316', padding: 18, borderRadius: 15, marginTop: 10 },
+  saveText: { fontWeight: '900', color: '#000', textAlign: 'center', fontSize: 16 },
+
+  // CARTES ADMINISTRATION HORIZONTALES
+  adminHorizontalCard: { 
+    flexDirection: 'row', 
+    backgroundColor: '#18181b', 
+    borderRadius: 20, 
+    padding: 15, 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    borderWidth: 1, 
+    borderColor: '#27272a', 
+    marginBottom: 12 
+  },
   cardLeftContent: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   cardSmallThumb: { width: 60, height: 60, borderRadius: 12, backgroundColor: '#000', resizeMode: 'contain' },
   cardMainText: { color: '#fff', fontWeight: '900', fontSize: 16, fontStyle: 'italic' },
   cardSubText: { color: '#f97316', fontSize: 14, fontWeight: '900' },
+  
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  actionEdit: { backgroundColor: '#27272a', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f6' },
-  actionBtnText: { color: '#3b82f6', fontSize: 12, fontWeight: '900' },
-  emptyHistory:{ color:'#777', textAlign:'center', fontStyle:'italic', marginTop:30, fontSize: 16 }
+  actionEdit: { color: '#3b82f6', fontWeight: '900' },
+  actionDelete: { color: '#ef4444', fontWeight: '900' },
+
+  // HISTORIQUE
+  historyCard: { backgroundColor: '#18181b', borderLeftWidth: 6, borderLeftColor: '#f97316', borderRadius: 15, padding: 15, marginVertical: 8 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  historyDate: { color: '#fff', fontWeight: '900', fontSize: 12 },
+  historyTotal: { color: '#f97316', fontWeight: '900', fontSize: 14 },
+  historyItemText: { color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 4 }
 });
 module.exports = App;
