@@ -8,19 +8,15 @@ const {
 const Svg = require('react-native-svg').default;
 const { Line, Polyline, Rect, Path, Circle } = require('react-native-svg');
 const ImagePicker = require('expo-image-picker');
-const { BleManager } = require('react-native-ble-plx');
 const FileSystem = require('expo-file-system');
 const Sharing = require('expo-sharing');
 const { Buffer } = require('buffer');
-const { Video, ResizeMode } = require('expo-av');
 const { BlurView } = require('expo-blur');
 const { Database } = require('./Database');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /* ===================== CONSTANTES ===================== */
-const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
-const PRINTER_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 const CARD_WIDTH = SCREEN_WIDTH * 0.55;
 const ITEM_SIZE = CARD_WIDTH;
 const DAILY_COLORS = [
@@ -85,32 +81,6 @@ const IconCheck = () => React.createElement(
 );
 
 /* ===================== MODULES UTILITAIRES ===================== */
-const bleManager = new BleManager();
-
-const buildEscPosTicket = (order) => {
-  let ticket = '';
-  ticket += '\x1B\x40';
-  ticket += '\x1B\x61\x01';
-  ticket += "NINJA'S FRIES\n\n";
-  ticket += '\x1B\x61\x00';
-  order.items.forEach(item => {
-    ticket += `${item.quantity}x ${item.name.toUpperCase()}\n`;
-    const extras = JSON.parse(item.extras || '{}');
-    const sauces = Array.isArray(extras.sauces) ? extras.sauces : [];
-    const garnitures = Array.isArray(extras.garnitures) ? extras.garnitures : [];
-    sauces.forEach(s => {
-      if (s && s.name) ticket += ` - Sauce: ${s.name.toUpperCase()}\n`;
-    });
-    garnitures.forEach(g => {
-      if (g && g.name) ticket += ` - Garniture: ${g.name.toUpperCase()}\n`;
-    });
-  });
-  ticket += '\n--------------------------\n';
-  ticket += `TOTAL: ${order.total} FCFA\n\n`;
-  ticket += '\x1D\x56\x00';
-  return ticket;
-};
-
 const exportOrdersToCSV = async (orderHistory) => {
   let csv = 'Date;Heure;Articles;Détails Extras;Total\n';
   orderHistory.forEach(o => {
@@ -147,10 +117,12 @@ const CheckoutScreen = ({ config, onConfirm, onClose, onRemoveItem }) => {
     try {
       const items = Database.getCartItems();
       const total = Database.getCartTotal();
-      setCartItems(items || []);
-      setTotalAmount(total || 0);
+      setCartItems(Array.isArray(items) ? items : []);
+      setTotalAmount(typeof total === 'number' ? total : 0);
     } catch (e) {
-      console.error("Erreur refreshCart SQL:", e);
+      console.error("Erreur refreshCart:", e);
+      setCartItems([]);
+      setTotalAmount(0);
     }
   };
 
@@ -278,26 +250,46 @@ function App() {
 
   useEffect(() => {
     const splashTimeout = setTimeout(() => {
-      if (splashVisible) setSplashVisible(false);
+      setSplashVisible(false);
     }, 1500);
     return () => clearTimeout(splashTimeout);
-  }, [splashVisible]);
+  }, []);
 
   useEffect(() => {
-    const initApp = async () => {
+    const initApp = () => {
       try {
-        Database.init();
+        const initialized = Database.init();
+        if (!initialized) {
+          console.warn('Initialisation DB échouée');
+        }
+        
         const savedLogo = Database.getSetting('logoUrl');
         const savedQr = Database.getSetting('qrCodeUrl');
-        setConfig({ logoUrl: savedLogo || '', qrCodeUrl: savedQr || '' });
-        setMenuItems(Database.getProducts('plat') || []);
-        setSauces(Database.getProducts('sauce') || []);
-        setGarnitures(Database.getProducts('garniture') || []);
-        setOrderHistory(Database.getSales() || []);
+        setConfig({ 
+          logoUrl: savedLogo || '', 
+          qrCodeUrl: savedQr || '' 
+        });
+        
+        const products = Database.getProducts('plat');
+        setMenuItems(Array.isArray(products) ? products : []);
+        
+        const saucesData = Database.getProducts('sauce');
+        setSauces(Array.isArray(saucesData) ? saucesData : []);
+        
+        const garnituresData = Database.getProducts('garniture');
+        setGarnitures(Array.isArray(garnituresData) ? garnituresData : []);
+        
+        const orders = Database.getSales();
+        setOrderHistory(Array.isArray(orders) ? orders : []);
       } catch (e) {
-        console.error("Erreur d'initialisation SQL :", e);
+        console.error("Erreur initialisation:", e);
+        setMenuItems([]);
+        setSauces([]);
+        setGarnitures([]);
+        setOrderHistory([]);
       }
     };
+    
     initApp();
   }, []);
 
@@ -306,16 +298,22 @@ function App() {
     {
       useNativeDriver: true,
       listener: (event) => {
-        const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
-        if (index !== currentIndex && index >= 0 && index < menuItems.length) {
-          setCurrentIndex(index);
-          resetControls();
+        try {
+          const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
+          if (index !== currentIndex && index >= 0 && index < menuItems.length) {
+            setCurrentIndex(index);
+            resetControls();
+          }
+        } catch (e) {
+          console.error('Erreur onScroll:', e);
         }
       },
     }
   );
 
-  const updateQuantity = (val) => setQuantity((prev) => Math.max(1, prev + val));
+  const updateQuantity = (val) => {
+    setQuantity((prev) => Math.max(1, prev + val));
+  };
 
   const resetControls = () => {
     setQuantity(1);
@@ -325,23 +323,27 @@ function App() {
   };
 
   const handleImageUpload = async (callback) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission nécessaire');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      base64: true
-    });
-    if (!result.canceled) {
-      callback(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission nécessaire');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        callback(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      }
+    } catch (e) {
+      console.error('Erreur upload image:', e);
     }
   };
 
   const toggleExtra = (type, item) => {
-    const list = selectedExtras[type];
+    const list = selectedExtras[type] || [];
     const exists = list.find((i) => i.id === item.id);
     setSelectedExtras({
       ...selectedExtras,
@@ -360,63 +362,64 @@ function App() {
   };
 
   const currentItem = menuItems.length > 0 ? menuItems[currentIndex] : null;
-  const extrasPrice = selectedExtras.garnitures.reduce((sum, g) => sum + (g.price || 0), 0);
-  const unitPrice = currentItem ? currentItem.price + extrasPrice : 0;
+  const extrasPrice = (selectedExtras.garnitures || []).reduce((sum, g) => sum + (g.price || 0), 0);
+  const unitPrice = currentItem ? (currentItem.price || 0) + extrasPrice : 0;
   const totalPrice = unitPrice * quantity;
 
-  const validateOrder = async () => {
-    const cartItems = Database.getCartItems();
-    if (cartItems.length === 0) return;
-    const total = Database.getCartTotal();
-    const orderData = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString('fr-FR'),
-      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      items: JSON.stringify(cartItems),
-      total: total,
-    };
+  const validateOrder = () => {
     try {
+      const cartItems = Database.getCartItems();
+      if (!cartItems || cartItems.length === 0) return;
+      
+      const total = Database.getCartTotal();
+      const orderData = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString('fr-FR'),
+        time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        items: JSON.stringify(cartItems),
+        total: total,
+      };
+      
       Database.insertOrder(orderData.items, orderData.total, orderData.date, orderData.time);
       setOrderHistory(Database.getOrders());
       Database.clearCart();
       setOrderSent(true);
       resetControls();
+      
       setTimeout(() => {
         setOrderSent(false);
         setView('menu');
       }, 3000);
     } catch (sqlError) {
-      console.error("Erreur critique SQL:", sqlError);
+      console.error("Erreur validation:", sqlError);
     }
   };
 
   const addToCart = () => {
-    if (!currentItem) return;
-    Database.addToCart(
-      currentItem.id,
-      currentItem.name,
-      quantity,
-      totalPrice,
-      JSON.stringify(selectedExtras)
-    );
-    setView('checkout');
+    try {
+      if (!currentItem) return;
+      Database.addToCart(
+        currentItem.id,
+        currentItem.name,
+        quantity,
+        totalPrice,
+        JSON.stringify(selectedExtras)
+      );
+      setView('checkout');
+    } catch (e) {
+      console.error('Erreur addToCart:', e);
+    }
   };
 
   if (splashVisible) {
     return React.createElement(
       View,
       { style: styles.splashContainer },
-      React.createElement(Video, {
-        source: require('./assets/lv_0_20260201104716.mp4'),
-        style: StyleSheet.absoluteFill,
-        resizeMode: ResizeMode.COVER,
-        shouldPlay: true,
-        isLooping: false,
-        onPlaybackStatusUpdate: (status) => {
-          if (status.didJustFinish) setSplashVisible(false);
-        },
-        onError: () => setSplashVisible(false)
-      })
+      React.createElement(
+        View,
+        { style: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' } },
+        React.createElement(Text, { style: { color: '#f97316', fontSize: 32, fontWeight: 'bold' } }, 'NINJA FRIES')
+      )
     );
   }
 
@@ -521,7 +524,7 @@ function App() {
                 setShowGarniturePicker(false);
               }
             },
-            React.createElement(Text, { style: styles.selectorBtnText }, `SAUCES (${selectedExtras.sauces.length})`)
+            React.createElement(Text, { style: styles.selectorBtnText }, `SAUCES (${(selectedExtras.sauces || []).length})`)
           ),
           React.createElement(
             View,
@@ -547,7 +550,7 @@ function App() {
             ScrollView,
             { horizontal: true, showsHorizontalScrollIndicator: false },
             (showSaucePicker ? sauces : garnitures).map((s) => {
-              const isSelected = selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id);
+              const isSelected = (selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'] || []).find(x => x.id === s.id);
               return React.createElement(
                 Pressable,
                 {
@@ -752,55 +755,6 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
           { style: styles.exportBtn, onPress: () => handleExportCSV(orderHistory) },
           React.createElement(Text, { style: styles.exportText }, 'EXPORTER L\'HISTORIQUE (CSV)')
         )
-      ),
-      activeForm && React.createElement(
-        View,
-        { style: styles.adminFormWrapper },
-        React.createElement(
-          Pressable,
-          { style: styles.backBtn, onPress: () => setActiveForm(null) },
-          React.createElement(IconChevronLeft, { size: 14, color: '#777' }),
-          React.createElement(Text, { style: styles.backText }, 'RETOUR')
-        ),
-        React.createElement(
-          View,
-          { style: styles.formCard },
-          (activeForm === 'plat' || activeForm === 'sauce' || activeForm === 'garniture') && React.createElement(
-            React.Fragment,
-            null,
-            React.createElement(Text, { style: styles.formTitle }, `NOUVEAU ${activeForm.toUpperCase()}`),
-            React.createElement(
-              Pressable,
-              {
-                style: styles.imagePicker,
-                onPress: () => handleImageUpload((res) => setFormItem({ ...formItem, image: res, type: activeForm }))
-              },
-              formItem.image
-                ? React.createElement(Image, { source: { uri: formItem.image }, style: styles.imagePreview })
-                : React.createElement(IconCamera)
-            ),
-            React.createElement(TextInput, {
-              placeholder: 'Nom',
-              placeholderTextColor: '#777',
-              style: styles.input,
-              value: formItem.name,
-              onChangeText: (t) => setFormItem({ ...formItem, name: t })
-            }),
-            activeForm !== 'sauce' && React.createElement(TextInput, {
-              placeholder: 'Prix (FCFA)',
-              placeholderTextColor: '#777',
-              keyboardType: 'numeric',
-              style: styles.input,
-              value: formItem.price,
-              onChangeText: (t) => setFormItem({ ...formItem, price: t })
-            }),
-            React.createElement(
-              Pressable,
-              { style: styles.saveBtn, onPress: handleAddItem },
-              React.createElement(Text, { style: styles.saveText }, 'ENREGISTRER')
-            )
-          )
-        )
       )
     )
   );
@@ -886,17 +840,7 @@ const styles = StyleSheet.create({
   adminBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1a1a1a', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#333' },
   adminBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   exportBtn: { backgroundColor: '#f97316', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  exportText: { color: '#000', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' },
-  adminFormWrapper: { paddingHorizontal: 20, paddingVertical: 15 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
-  backText: { color: '#777', fontWeight: '600', fontSize: 12 },
-  formCard: { backgroundColor: '#1a1a1a', padding: 20, borderRadius: 15, borderWidth: 1, borderColor: '#333' },
-  formTitle: { fontSize: 16, fontWeight: '900', color: '#f97316', marginBottom: 15, textTransform: 'uppercase' },
-  imagePicker: { width: '100%', height: 150, backgroundColor: '#000', borderRadius: 10, borderWidth: 2, borderColor: '#333', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  imagePreview: { width: '100%', height: '100%', borderRadius: 10 },
-  input: { borderWidth: 1, borderColor: '#555', borderRadius: 10, paddingHorizontal: 15, paddingVertical: 12, color: '#fff', marginBottom: 12, backgroundColor: '#000' },
-  saveBtn: { backgroundColor: '#f97316', padding: 14, borderRadius: 10, alignItems: 'center' },
-  saveText: { color: '#000', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' }
+  exportText: { color: '#000', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' }
 });
 
 module.exports = App;
