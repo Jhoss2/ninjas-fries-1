@@ -715,145 +715,175 @@ const AdminPanel = ({ styles, config, setConfig, menuItems, setMenuItems, sauces
   );
 };
 
-  const styles = StyleSheet.create({
-  // STRUCTURE RACINE
-  root: { 
-    flex: 1, 
-    backgroundColor: '#000', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingVertical: 20 
+    
+    const styles = StyleSheet.create({
+  // FOND DE L'APPLICATION (VANTA BLACK)
+  root: {
+    flex: 1,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 
-  // ZONE CARROUSEL : Hauteur optimisée pour le zoom 1.25x
-  carouselContainer: { 
-    height: SCREEN_HEIGHT * 0.52, 
-    justifyContent: 'center', 
-    overflow: 'visible', 
-    width: SCREEN_WIDTH 
+  // SPLASH SCREEN NOIR
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
   },
 
-  // MASQUES LATERAUX : Effet de focus progressif
-  fadeEdge: { 
-    position: 'absolute', 
-    top: 0, 
-    bottom: 0, 
-    width: SCREEN_WIDTH * 0.2, 
-    backgroundColor: 'transparent', 
-    zIndex: 10 
+  // CONTENEUR TABLET / MOBILE
+  tablet: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 500,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 40,
   },
 
-  // LA CARTE : Uniquement un support pour l'image (plus de texte)
-  card: { 
-    width: CARD_WIDTH, 
-    height: CARD_WIDTH, 
-    backgroundColor: 'transparent', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  // 1. SECTION PRIX (HAUT FIXE)
+  priceContainer: {
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    marginTop: 80, // Espace pour laisser place au logo au-dessus
+  },
+  price: {
+    fontSize: 72,
+    fontWeight: '900',
+    color: '#f97316',
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(249, 115, 22, 0.4)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 15,
+  },
+  priceUnit: {
+    fontSize: 24,
+    color: '#f97316',
   },
 
-  // L'IMAGE : Agrandie avec Glow (Ombre portée intense)
-  itemImage: { 
-    width: CARD_WIDTH, 
-    height: CARD_WIDTH, 
-    shadowColor: "#f97316", 
-    shadowOffset: { width: 0, height: 30 }, 
-    shadowOpacity: 0.7, 
-    shadowRadius: 40, 
-    backgroundColor: 'transparent' 
+  // 2. SECTION CARROUSEL (CENTRE)
+  carouselContainer: {
+    height: SCREEN_HEIGHT * 0.45,
+    width: SCREEN_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
+  },
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 30,
+  },
+  itemImage: {
+    width: '100%',
+    height: '100%',
   },
 
-  // INFOS PRODUIT : Déportées sous le carrousel
-  infoSection: { 
-    alignItems: 'center', 
-    marginBottom: 20 
-  },
-  priceUnit: { 
-    fontSize: 24 
-  },
-
-  // BOUTON DE COMMANDE PREMIUM
-  orderBtn: { 
-    backgroundColor: '#f97316', 
-    padding: 22, 
-    borderRadius: 40, 
-    width: SCREEN_WIDTH * 0.85, 
-    alignItems: 'center', 
-    marginBottom: 40,
-    shadowColor: "#f97316",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 25,
-    elevation: 10
-  },
-  orderText: { 
-    color: '#fff', 
-    fontWeight: '900', 
-    fontSize: 20, 
-    letterSpacing: 1.5, 
-    fontStyle: 'italic' 
+  // MASQUES DE BORDURE (EFFET ESTOMPÉ)
+  fadeEdge: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: SCREEN_WIDTH * 0.2,
+    backgroundColor: '#000000',
+    opacity: 0.8,
+    zIndex: 5,
   },
 
-  // SECTION ADMIN / HISTORIQUE (RESTAURÉ)
-  adminBtn: { position: 'absolute', top: 50, left: 20, zIndex: 100 },
-  historyBtn: { position: 'absolute', top: 50, right: 20, zIndex: 100 },
-  adminIconText: { fontSize: 24 },
-
-  // MODALES & INPUTS
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
-  adminPanel: { width: '90%', backgroundColor: '#09090b', borderRadius: 30, padding: 25, borderWeight: 1, borderColor: '#27272a' },
-  formTitle: { color: '#f97316', fontWeight: '900', fontSize: 24, fontStyle: 'italic', marginBottom: 20, textAlign: 'center' },
-  input: { backgroundColor: '#18181b', color: '#fff', padding: 15, borderRadius: 15, marginBottom: 15, fontWeight: '700' },
-  
-  saveBtn: { backgroundColor: '#f97316', padding: 18, borderRadius: 15, marginTop: 10 },
-  saveText: { fontWeight: '900', color: '#000', textAlign: 'center', fontSize: 16 },
-
-  // CARTES ADMINISTRATION HORIZONTALES
-  adminHorizontalCard: { 
-    flexDirection: 'row', 
-    backgroundColor: '#18181b', 
-    borderRadius: 20, 
-    padding: 15, 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    borderWidth: 1, 
-    borderColor: '#27272a', 
-    marginBottom: 12 
+  // 3. SECTION NOM ET BOUTON (BAS FIXE)
+  bottomInfoSection: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: 20,
+    zIndex: 10,
   },
-  cardLeftContent: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  cardSmallThumb: { width: 60, height: 60, borderRadius: 12, backgroundColor: '#000', resizeMode: 'contain' },
-  cardMainText: { color: '#fff', fontWeight: '900', fontSize: 16, fontStyle: 'italic' },
-  cardSubText: { color: '#f97316', fontSize: 14, fontWeight: '900' },
-  
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  actionEdit: { color: '#3b82f6', fontWeight: '900' },
-  actionDelete: { color: '#ef4444', fontWeight: '900' },
-
-  // HISTORIQUE
-  historyCard: { backgroundColor: '#18181b', borderLeftWidth: 6, borderLeftColor: '#f97316', borderRadius: 15, padding: 15, marginVertical: 8 },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  historyDate: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  historyTotal: { color: '#f97316', fontWeight: '900', fontSize: 14 },
-  historyItemText: { color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 4 }
-});
-  itemNameText: { 
-    color: '#FFF', 
-    fontWeight: '900', 
-    fontSize: 42, 
-    fontStyle: 'italic', 
+  itemNameText: {
+    color: '#FFFFFF',
+    fontSize: 42,
+    fontWeight: '900',
+    fontStyle: 'italic',
     textAlign: 'center',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    marginBottom: 30,
+    letterSpacing: -1,
+  },
+  orderButton: {
+    backgroundColor: '#f97316',
+    paddingVertical: 20,
+    paddingHorizontal: 60,
+    borderRadius: 50,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  orderButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: 1,
   },
 
-  // PRIX DYNAMIQUE
-  priceContainer: { 
-    alignItems: 'center', 
-    marginTop: 10 
+  // --- CONFIGURATION LOGO (AJUSTABLE) ---
+  logoWrapper: {
+    position: 'absolute',
+    top: 50,
+    alignItems: 'center',
+    width: '100%',
+    zIndex: 20,
   },
-  price: { 
-    fontSize: 72, 
-    fontWeight: '900', 
-    color: '#f97316', 
-    fontStyle: 'italic' 
+  logo: {
+    width: 180,  // TAILLE : Modifie ce chiffre pour la largeur
+    height: 100,  // TAILLE : Modifie ce chiffre pour la hauteur
+    resizeMode: 'contain',
   },
-module.exports = App;
+  brandText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    fontStyle: 'italic',
+  },
+  adminAccess: {
+    position: 'absolute',
+    top: 50,
+    left: 25,
+    zIndex: 100,
+    padding: 10,
+  },
+
+  // MODALE ADMIN
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passBox: {
+    width: '85%',
+    backgroundColor: '#18181b',
+    padding: 30,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  passInput: {
+    backgroundColor: '#000',
+    color: '#f97316',
+    padding: 20,
+    borderRadius: 15,
+    fontSize: 24,
+    textAlign: 'center',
+    marginVertical: 20,
+    fontWeight: '900',
+  }
+});
+export default App;
