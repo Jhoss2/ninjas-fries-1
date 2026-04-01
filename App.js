@@ -102,10 +102,17 @@ function App() {
     if (status !== 'granted') { alert('Permission nécessaire'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      quality: 1,
       base64: true,
     });
-    if (!result.canceled) callback(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    if (!result.canceled) {
+      const asset    = result.assets[0];
+      const uri      = asset.uri || '';
+      const isPng    = uri.toLowerCase().endsWith('.png')
+                    || (asset.mimeType && asset.mimeType.includes('png'));
+      const mimeType = isPng ? 'image/png' : 'image/jpeg';
+      callback(`data:${mimeType};base64,${asset.base64}`);
+    }
   };
 
   /* ── Accès admin — lit le mot de passe depuis la DB ── */
@@ -309,4 +316,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
-        
+  
