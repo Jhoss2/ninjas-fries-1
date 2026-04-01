@@ -49,11 +49,8 @@ function App() {
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  /* ── Splash timeout de secours ── */
-  useEffect(() => {
-    const t = setTimeout(() => { if (splashVisible) setSplashVisible(false); }, 1500);
-    return () => clearTimeout(t);
-  }, [splashVisible]);
+  /* ── Splash : pas de timeout forcé, on laisse la vidéo se terminer ── */
+  // Le fallback onError() dans SplashScreen gère les cas d'échec de lecture
 
   /* ── Init BDD + Firebase ── */
   useEffect(() => {
@@ -312,3 +309,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
+        
