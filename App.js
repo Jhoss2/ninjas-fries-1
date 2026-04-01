@@ -1,5 +1,5 @@
 const React = require('react');
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useCallback, memo } = React;
 const {
   View, Text, Pressable, TextInput, ImageBackground,
   Modal, StyleSheet, SafeAreaView, Animated,
@@ -22,6 +22,65 @@ const AdminPanel      = require('./screens/AdminPanel');
 /* ═══════════════════════════════════════════
    COMPOSANT PRINCIPAL
 ═══════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════
+   MODAL MOT DE PASSE — composant mémorisé
+   Isolé pour éviter le re-render du TextInput
+   qui fait perdre le focus du clavier Android
+═══════════════════════════════════════════ */
+const PasswordModal = memo(({ visible, onClose, onConfirm }) => {
+  const [input, setInput] = React.useState('');
+
+  const handleClose = useCallback(() => {
+    setInput('');
+    onClose();
+  }, [onClose]);
+
+  const handleConfirm = useCallback(() => {
+    onConfirm(input);
+    setInput('');
+  }, [input, onConfirm]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={passStyles.overlay}>
+        <View style={passStyles.box}>
+          <IconLock />
+          <TextInput
+            secureTextEntry
+            style={passStyles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Code Corporation"
+            placeholderTextColor="#777"
+            returnKeyType="done"
+            onSubmitEditing={handleConfirm}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <View style={passStyles.actions}>
+            <Pressable style={passStyles.cancelBtn} onPress={handleClose}>
+              <Text style={{ color: 'white', fontWeight: '700' }}>ANNULER</Text>
+            </Pressable>
+            <Pressable style={passStyles.confirmBtn} onPress={handleConfirm}>
+              <Text style={{ color: 'black', fontWeight: '700' }}>ENTRER</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+const passStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  box:     { width: '85%', backgroundColor: '#18181b', padding: 30, borderRadius: 30, borderWidth: 1, borderColor: '#27272a', alignItems: 'center' },
+  input:   { backgroundColor: '#000', color: '#f97316', padding: 20, borderRadius: 15, fontSize: 24, textAlign: 'center', marginVertical: 20, fontWeight: '900', width: '100%' },
+  actions: { flexDirection: 'row', gap: 15 },
+  cancelBtn: { flex: 1, backgroundColor: '#27272a', padding: 16, borderRadius: 25, alignItems: 'center' },
+  confirmBtn: { flex: 1, backgroundColor: '#f97316', padding: 16, borderRadius: 25, alignItems: 'center' },
+});
+
 function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const [view, setView]                   = useState('menu');
@@ -232,32 +291,18 @@ function App() {
           </Pressable>
         )}
 
-        {/* Modal mot de passe */}
-        <Modal visible={showPassModal} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.passBox}>
-              <IconLock />
-              <TextInput
-                secureTextEntry
-                style={styles.passInput}
-                value={passwordInput}
-                onChangeText={setPasswordInput}
-                placeholder="Code Corporation"
-                placeholderTextColor="#777"
-                returnKeyType="done"
-                onSubmitEditing={checkAdminAccess}
-              />
-              <View style={styles.passActions}>
-                <Pressable style={styles.cancelBtn} onPress={() => { setShowPassModal(false); setPasswordInput(''); }}>
-                  <Text style={{ color: 'white', fontWeight: '700' }}>ANNULER</Text>
-                </Pressable>
-                <Pressable style={styles.confirmBtn} onPress={checkAdminAccess}>
-                  <Text style={{ color: 'black', fontWeight: '700' }}>ENTRER</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        {/* Modal mot de passe — composant mémorisé pour stabilité clavier Android */}
+        <PasswordModal
+          visible={showPassModal}
+          onClose={() => setShowPassModal(false)}
+          onConfirm={(input) => {
+            const storedPass = Database.getSetting('adminPassword') || "NINJA'S CORPORATION";
+            if (input === storedPass) {
+              setView('settings');
+              setShowPassModal(false);
+            }
+          }}
+        />
 
         {/* Panneau admin */}
         {view === 'settings' && (
@@ -304,4 +349,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
-          
+    
