@@ -1,86 +1,187 @@
 const React = require('react');
-const { useRef } = React;
+const { useRef, useState, useCallback, memo } = React;
 const {
   View, Text, Image, Pressable,
-  ScrollView, StyleSheet, Animated, Dimensions
+  ScrollView, StyleSheet, Animated
 } = require('react-native');
 
 const { SCREEN_WIDTH, CARD_WIDTH, ITEM_SIZE } = require('../constants');
 
-const MenuScreen = ({
-  config,
-  menuItems,
-  sauces,
-  garnitures,
-  currentIndex,
-  setCurrentIndex,
-  quantity,
-  setQuantity,
-  showSaucePicker,
-  setShowSaucePicker,
-  showGarniturePicker,
-  setShowGarniturePicker,
-  selectedExtras,
-  setSelectedExtras,
-  scrollX,
-  onAddToCart,
-  onAdminPress,
-}) => {
-  const currentItem = menuItems.length > 0 ? menuItems[currentIndex] : null;
-  const extrasPrice = selectedExtras.garnitures.reduce((sum, g) => sum + (g.price || 0), 0);
-  const unitPrice   = currentItem ? currentItem.price + extrasPrice : 0;
-  const totalPrice  = unitPrice * quantity;
+/* ═══════════════════════════════════════════════════════
+   CARROUSEL — composant totalement isolé et mémorisé.
+   Gère son propre scrollX et son propre currentIndex.
+   Ne reçoit que la liste des plats et un callback
+   onItemChange → zéro re-render depuis l'extérieur.
+═══════════════════════════════════════════════════════ */
+const Carousel = memo(({ items, onItemChange }) => {
+  const scrollX = useRef(new Animated.Value(0)).current;
 
-  // ── Copie conforme de l'original ──
-  const updateQuantity = (val) => setQuantity((prev) => Math.max(1, prev + val));
-
-  const resetControls = () => {
-    setQuantity(1);
-    setSelectedExtras({ sauces: [], garnitures: [] });
-    setShowSaucePicker(false);
-    setShowGarniturePicker(false);
-  };
-
-  const toggleExtra = (type, item) => {
-    const list   = selectedExtras[type];
-    const exists = list.find((i) => i.id === item.id);
-    setSelectedExtras({
-      ...selectedExtras,
-      [type]: exists ? list.filter((i) => i.id !== item.id) : [...list, item],
-    });
-  };
-
-  // ── onScroll original exact ──
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     {
       useNativeDriver: true,
       listener: (event) => {
         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
-        if (index !== currentIndex && index >= 0 && index < menuItems.length) {
-          setCurrentIndex(index);
-          resetControls();
+        if (index >= 0 && index < items.length) {
+          onItemChange(index);
         }
       },
     }
   );
 
   return (
+    <View style={styles.carouselContainer}>
+      <Animated.ScrollView
+        horizontal
+        pagingEnabled
+        snapToInterval={ITEM_SIZE}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2 }}
+      >
+        {items.map((item, index) => {
+          const scale = scrollX.interpolate({
+            inputRange: [
+              (index - 1) * ITEM_SIZE,
+              index * ITEM_SIZE,
+              (index + 1) * ITEM_SIZE,
+            ],
+            outputRange: [0.4, 1.25, 0.4],
+            extrapolate: 'clamp',
+          });
+          const opacity = scrollX.interpolate({
+            inputRange: [
+              (index - 1) * ITEM_SIZE,
+              index * ITEM_SIZE,
+              (index + 1) * ITEM_SIZE,
+            ],
+            outputRange: [0.3, 1, 0.3],
+            extrapolate: 'clamp',
+          });
+          return (
+            <View
+              key={item.id}
+              style={{ width: ITEM_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
+                <Image
+                  source={{ uri: item.image }}
+                  style={styles.itemImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+            </View>
+          );
+        })}
+      </Animated.ScrollView>
+    </View>
+  );
+});
+
+/* ═══════════════════════════════════════════════════════
+   EXTRAS PICKER — mémorisé pour ne pas bouger le carrousel
+═══════════════════════════════════════════════════════ */
+const ExtrasPicker = memo(({ items, selected, onToggle, showPrice }) => (
+  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    {items.map((s) => (
+      <Pressable
+        key={s.id}
+        onPress={() => onToggle(s)}
+        style={[
+          styles.extraItemVertical,
+          selected.find(x => x.id === s.id) && styles.extraItemActive,
+        ]}
+      >
+        {s.image
+          ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" />
+          : <View style={styles.extraImageFallback}><Text style={{ fontSize: 8, color: '#555' }}>IMAGE</Text></View>
+        }
+        <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
+        {showPrice && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
+      </Pressable>
+    ))}
+  </ScrollView>
+));
+
+/* ═══════════════════════════════════════════════════════
+   MENU SCREEN PRINCIPAL
+═══════════════════════════════════════════════════════ */
+const MenuScreen = ({
+  config,
+  menuItems,
+  sauces,
+  garnitures,
+  onAddToCart,
+  onAdminPress,
+}) => {
+  // Tous les états locaux ici — aucun ne remonte vers App
+  const [currentIndex, setCurrentIndex]     = useState(0);
+  const [quantity, setQuantity]             = useState(1);
+  const [showSaucePicker, setShowSaucePicker]         = useState(false);
+  const [showGarniturePicker, setShowGarniturePicker] = useState(false);
+  const [selectedSauces, setSelectedSauces]       = useState([]);
+  const [selectedGarnitures, setSelectedGarnitures] = useState([]);
+
+  const currentItem   = menuItems.length > 0 ? menuItems[currentIndex] : null;
+  const extrasPrice   = selectedGarnitures.reduce((sum, g) => sum + (g.price || 0), 0);
+  const unitPrice     = currentItem ? currentItem.price + extrasPrice : 0;
+  const totalPrice    = unitPrice * quantity;
+
+  const updateQuantity = useCallback((val) => {
+    setQuantity((prev) => Math.max(1, prev + val));
+  }, []);
+
+  // Appelé par le Carousel — mémorisé pour ne PAS recréer le composant
+  const handleItemChange = useCallback((index) => {
+    setCurrentIndex(index);
+    setQuantity(1);
+    setSelectedSauces([]);
+    setSelectedGarnitures([]);
+    setShowSaucePicker(false);
+    setShowGarniturePicker(false);
+  }, []);
+
+  const toggleSauce = useCallback((item) => {
+    setSelectedSauces(prev => {
+      const exists = prev.find(i => i.id === item.id);
+      return exists ? prev.filter(i => i.id !== item.id) : [...prev, item];
+    });
+  }, []);
+
+  const toggleGarniture = useCallback((item) => {
+    setSelectedGarnitures(prev => {
+      const exists = prev.find(i => i.id === item.id);
+      return exists ? prev.filter(i => i.id !== item.id) : [...prev, item];
+    });
+  }, []);
+
+  const handleOrder = useCallback(() => {
+    onAddToCart(totalPrice, {
+      sauces: selectedSauces,
+      garnitures: selectedGarnitures,
+    }, currentIndex);
+    setQuantity(1);
+    setSelectedSauces([]);
+    setSelectedGarnitures([]);
+    setShowSaucePicker(false);
+    setShowGarniturePicker(false);
+  }, [totalPrice, selectedSauces, selectedGarnitures, currentIndex]);
+
+  return (
     <>
-      {/* ÉLÉMENTS FIXES DU HAUT */}
+      {/* HAUT */}
       <View style={styles.fixedTop}>
         <View style={styles.logoWrapper}>
-          {config.logoUrl ? (
-            <Image source={{ uri: config.logoUrl }} style={styles.logo} />
-          ) : (
-            <Text style={styles.brandText}>NINJA <Text style={{ color: '#f97316' }}>FRIES</Text></Text>
-          )}
+          {config.logoUrl
+            ? <Image source={{ uri: config.logoUrl }} style={styles.logo} />
+            : <Text style={styles.brandText}>NINJA <Text style={{ color: '#f97316' }}>FRIES</Text></Text>
+          }
         </View>
-
         <Pressable style={styles.adminAccess} onPress={onAdminPress}>
           <Text style={{ color: '#f97316', fontSize: 24 }}>⚙</Text>
         </Pressable>
-
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
             {currentItem ? totalPrice : 0}
@@ -89,44 +190,14 @@ const MenuScreen = ({
         </View>
       </View>
 
-      {/* CARROUSEL CENTRAL — copie conforme de l'original */}
-      <View style={styles.carouselContainer}>
-        <Animated.ScrollView
-          horizontal
-          pagingEnabled
-          snapToInterval={ITEM_SIZE}
-          decelerationRate="fast"
-          showsHorizontalScrollIndicator={false}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          contentContainerStyle={{ paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2 }}
-        >
-          {menuItems.map((item, index) => {
-            const scale = scrollX.interpolate({
-              inputRange: [(index - 1) * ITEM_SIZE, index * ITEM_SIZE, (index + 1) * ITEM_SIZE],
-              outputRange: [0.4, 1.25, 0.4],
-              extrapolate: 'clamp',
-            });
-            const opacity = scrollX.interpolate({
-              inputRange: [(index - 1) * ITEM_SIZE, index * ITEM_SIZE, (index + 1) * ITEM_SIZE],
-              outputRange: [0.3, 1, 0.3],
-              extrapolate: 'clamp',
-            });
-            return (
-              <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
-                  <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="contain" />
-                </Animated.View>
-              </View>
-            );
-          })}
-        </Animated.ScrollView>
-      </View>
+      {/* CARROUSEL — composant isolé */}
+      <Carousel items={menuItems} onItemChange={handleItemChange} />
 
-      {/* ZONE DE COMMANDE FIXE EN BAS */}
+      {/* BAS */}
       <View style={styles.fixedBottom}>
         <View style={styles.controlsWrapper}>
-          {/* LIGNE 1 : TITRE [-] NOM [+] */}
+
+          {/* [-] NOM [+] */}
           <View style={styles.titleRow}>
             <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(-1)}>
               <Text style={styles.titleQtyBtnText}>-</Text>
@@ -137,13 +208,13 @@ const MenuScreen = ({
             </Pressable>
           </View>
 
-          {/* LIGNE 2 : SÉLECTEURS [SAUCES] (BADGE) [GARNITURES] */}
+          {/* [SAUCES] (QTÉ) [GARNITURES] */}
           <View style={styles.selectorsRow}>
             <Pressable
               style={[styles.selectorBtn, { borderColor: '#f97316' }]}
-              onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}
+              onPress={() => { setShowSaucePicker(v => !v); setShowGarniturePicker(false); }}
             >
-              <Text style={styles.selectorBtnText}>SAUCES ({selectedExtras.sauces.length})</Text>
+              <Text style={styles.selectorBtnText}>SAUCES ({selectedSauces.length})</Text>
             </Pressable>
 
             <View style={styles.qtyBadgeCenter}>
@@ -152,36 +223,36 @@ const MenuScreen = ({
 
             <Pressable
               style={[styles.selectorBtn, { borderColor: '#f97316' }]}
-              onPress={() => { setShowGarniturePicker(!showGarniturePicker); setShowSaucePicker(false); }}
+              onPress={() => { setShowGarniturePicker(v => !v); setShowSaucePicker(false); }}
             >
               <Text style={styles.selectorBtnText}>GARNITURES</Text>
             </Pressable>
           </View>
 
-          {/* CARROUSEL EXTRAS */}
-          {(showSaucePicker || showGarniturePicker) && (
+          {/* EXTRAS */}
+          {showSaucePicker && (
             <View style={styles.extrasDropdown}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {(showSaucePicker ? sauces : garnitures).map((s) => (
-                  <Pressable
-                    key={s.id}
-                    onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)}
-                    style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}
-                  >
-                    {s.image
-                      ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" />
-                      : <View style={styles.extraImageFallback}><Text style={{ fontSize: 8, color: '#555' }}>IMAGE</Text></View>
-                    }
-                    <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
-                    {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <ExtrasPicker
+                items={sauces}
+                selected={selectedSauces}
+                onToggle={toggleSauce}
+                showPrice={false}
+              />
+            </View>
+          )}
+          {showGarniturePicker && (
+            <View style={styles.extrasDropdown}>
+              <ExtrasPicker
+                items={garnitures}
+                selected={selectedGarnitures}
+                onToggle={toggleGarniture}
+                showPrice={true}
+              />
             </View>
           )}
         </View>
 
-        <Pressable style={styles.orderBtnBottom} onPress={() => onAddToCart(totalPrice)}>
+        <Pressable style={styles.orderBtnBottom} onPress={handleOrder}>
           <Text style={styles.orderText}>COMMANDER</Text>
         </Pressable>
       </View>
@@ -190,23 +261,17 @@ const MenuScreen = ({
 };
 
 const styles = StyleSheet.create({
-  // SECTION HAUT FIXE
   fixedTop: { width: '100%', alignItems: 'center', zIndex: 50, paddingBottom: 10 },
   logoWrapper: { width: '100%', alignItems: 'center', marginTop: 10 },
-  // resizeMode contain + backgroundColor transparent → PNG logo sans fond
   logo: { width: 150, height: 80, resizeMode: 'contain', backgroundColor: 'transparent' },
   brandText: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   adminAccess: { position: 'absolute', top: 20, left: 25, zIndex: 100, padding: 10 },
   priceContainer: { height: 80, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
   price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15 },
   priceUnit: { fontSize: 20, color: '#f97316' },
-
-  // CARROUSEL — styles originaux + backgroundColor transparent sur card et image
   carouselContainer: { flex: 1, width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
   card: { width: CARD_WIDTH, height: CARD_WIDTH, justifyContent: 'center', alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 30, backgroundColor: 'transparent' },
   itemImage: { width: '100%', height: '100%', backgroundColor: 'transparent' },
-
-  // SECTION BAS FIXE
   fixedBottom: { width: '100%', paddingHorizontal: 20, paddingBottom: 20, zIndex: 50 },
   controlsWrapper: { width: '100%', marginBottom: 15 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 15 },
@@ -230,4 +295,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = MenuScreen;
-            
+  
