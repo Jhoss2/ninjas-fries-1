@@ -87,12 +87,7 @@ function App() {
   const [config, setConfig]               = useState({ logoUrl: '', qrCodeUrl: '', backgroundUrl: '' });
   const [cartId, setCartId]               = useState(null);
 
-  // Menu
-  const [currentIndex, setCurrentIndex]         = useState(0);
-  const [quantity, setQuantity]                 = useState(1);
-  const [showSaucePicker, setShowSaucePicker]   = useState(false);
-  const [showGarniturePicker, setShowGarniturePicker] = useState(false);
-  const [selectedExtras, setSelectedExtras]     = useState({ sauces: [], garnitures: [] });
+  // Menu — états gérés localement dans MenuScreen
 
   // Données
   const [menuItems, setMenuItems]       = useState([]);
@@ -106,7 +101,6 @@ function App() {
   const [passwordInput, setPasswordInput]   = useState('');
   const [activeForm, setActiveForm]         = useState(null);
 
-  const scrollX = useRef(new Animated.Value(0)).current;
 
   /* ── Splash : pas de timeout forcé, on laisse la vidéo se terminer ── */
   // Le fallback onError() dans SplashScreen gère les cas d'échec de lecture
@@ -149,13 +143,6 @@ function App() {
   }, []);
 
   /* ── Helpers ── */
-  const resetControls = () => {
-    setQuantity(1);
-    setSelectedExtras({ sauces: [], garnitures: [] });
-    setShowSaucePicker(false);
-    setShowGarniturePicker(false);
-  };
-
   const handleImageUpload = async (callback) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { alert('Permission nécessaire'); return; }
@@ -199,13 +186,13 @@ function App() {
     }
   };
 
-  /* ── Ajout au panier ── */
-  const addToCart = (totalPrice) => {
-    const currentItem = menuItems.length > 0 ? menuItems[currentIndex] : null;
+  /* ── Ajout au panier — reçoit extras et index depuis MenuScreen ── */
+  const addToCart = (totalPrice, extras, itemIndex) => {
+    const currentItem = menuItems.length > 0 ? menuItems[itemIndex] : null;
     if (!currentItem) return;
-    Database.addToCart(currentItem.id, currentItem.name, quantity, totalPrice, JSON.stringify(selectedExtras));
+    const extrasObj = extras || { sauces: [], garnitures: [] };
+    Database.addToCart(currentItem.id, currentItem.name, 1, totalPrice, JSON.stringify(extrasObj));
     setView('checkout');
-    resetControls();
   };
 
   /* ── Validation commande ── */
@@ -222,7 +209,6 @@ function App() {
       setOrderHistory(Database.getOrders());
       Database.clearCart();
       setOrderSent(true);
-      resetControls();
       setTimeout(() => { setOrderSent(false); setView('menu'); }, 3000);
     } catch (e) {
       console.error('Erreur commande:', e);
@@ -257,17 +243,6 @@ function App() {
           menuItems={menuItems}
           sauces={sauces}
           garnitures={garnitures}
-          currentIndex={currentIndex}
-          setCurrentIndex={setCurrentIndex}
-          quantity={quantity}
-          setQuantity={setQuantity}
-          showSaucePicker={showSaucePicker}
-          setShowSaucePicker={setShowSaucePicker}
-          showGarniturePicker={showGarniturePicker}
-          setShowGarniturePicker={setShowGarniturePicker}
-          selectedExtras={selectedExtras}
-          setSelectedExtras={setSelectedExtras}
-          scrollX={scrollX}
           onAddToCart={addToCart}
           onAdminPress={() => setShowPassModal(true)}
         />
