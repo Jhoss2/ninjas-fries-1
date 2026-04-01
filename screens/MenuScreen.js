@@ -1,155 +1,12 @@
 const React = require('react');
-const { useState, useRef, useEffect } = React;
+const { useRef } = React;
 const {
-  View, Text, Image, Pressable, ScrollView,
-  StyleSheet, Animated, PanResponder, Dimensions,
+  View, Text, Image, Pressable,
+  ScrollView, StyleSheet, Animated
 } = require('react-native');
 
-const { SCREEN_WIDTH } = require('../constants');
+const { SCREEN_WIDTH, CARD_WIDTH, ITEM_SIZE } = require('../constants');
 
-/* ═══════════════════════════════════════════════════
-   CONSTANTES DU CARROUSEL
-═══════════════════════════════════════════════════ */
-const IMAGE_SIZE     = SCREEN_WIDTH * 0.68;  // taille image active
-const ITEM_WIDTH     = SCREEN_WIDTH * 0.72;  // espace par item (image + marges)
-const SIDE_SCALE     = 0.60;                 // scale items non-actifs
-const SIDE_OPACITY   = 0.40;                 // opacité items non-actifs
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.15; // distance min pour changer d'item
-const SPRING_CONFIG  = {
-  tension:   60,   // rigidité du ressort (plus élevé = plus rapide)
-  friction:  10,   // amortissement (plus élevé = moins de rebond)
-  useNativeDriver: true,
-};
-
-/* ═══════════════════════════════════════════════════
-   COMPOSANT CARROUSEL INTERNE
-   Utilise PanResponder pour un contrôle total du swipe
-   + Animated.spring pour le snap fluide
-═══════════════════════════════════════════════════ */
-const Carousel = ({ items, currentIndex, setCurrentIndex, onIndexChange }) => {
-  // Position X animée — représente le décalage horizontal total
-  const translateX = useRef(new Animated.Value(-currentIndex * ITEM_WIDTH)).current;
-  const currentIndexRef = useRef(currentIndex);
-
-  // Sync si currentIndex change depuis l'extérieur
-  useEffect(() => {
-    currentIndexRef.current = currentIndex;
-    snapTo(currentIndex, false);
-  }, [currentIndex]);
-
-  const snapTo = (index, animated = true) => {
-    const toValue = -index * ITEM_WIDTH;
-    if (animated) {
-      Animated.spring(translateX, {
-        toValue,
-        ...SPRING_CONFIG,
-      }).start();
-    } else {
-      translateX.setValue(toValue);
-    }
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      // On capture le geste horizontal
-      onMoveShouldSetPanResponder: (_, gs) =>
-        Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 5,
-      onMoveShouldSetPanResponderCapture: (_, gs) =>
-        Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 5,
-
-      onPanResponderGrant: () => {
-        // Stoppe toute animation en cours et récupère la position réelle
-        translateX.stopAnimation();
-        translateX.setOffset(translateX._value);
-        translateX.setValue(0);
-      },
-
-      onPanResponderMove: (_, gs) => {
-        // Résistance aux bords (premier et dernier item)
-        const idx   = currentIndexRef.current;
-        const total = items.length;
-        let dx = gs.dx;
-        if ((idx === 0 && dx > 0) || (idx === total - 1 && dx < 0)) {
-          dx = dx * 0.25; // friction élastique aux bords
-        }
-        translateX.setValue(dx);
-      },
-
-      onPanResponderRelease: (_, gs) => {
-        translateX.flattenOffset();
-        const idx   = currentIndexRef.current;
-        const total = items.length;
-
-        let nextIndex = idx;
-        if (gs.dx < -SWIPE_THRESHOLD && idx < total - 1) {
-          nextIndex = idx + 1;
-        } else if (gs.dx > SWIPE_THRESHOLD && idx > 0) {
-          nextIndex = idx - 1;
-        }
-
-        currentIndexRef.current = nextIndex;
-        onIndexChange(nextIndex);
-        snapTo(nextIndex, true);
-      },
-
-      onPanResponderTerminate: () => {
-        translateX.flattenOffset();
-        snapTo(currentIndexRef.current, true);
-      },
-    })
-  ).current;
-
-  return (
-    <View style={styles.carouselViewport} {...panResponder.panHandlers}>
-      <Animated.View
-        style={[
-          styles.carouselTrack,
-          {
-            width: ITEM_WIDTH * items.length,
-            transform: [{ translateX }],
-          },
-        ]}
-      >
-        {items.map((item, index) => {
-          // Calcul des animations basé sur l'index relatif au currentIndex
-          // On utilise une interpolation "manuelle" via la position translateX
-          // pour scale et opacity de chaque card
-          const distance = index - currentIndex;
-
-          // Scale et opacité basés sur la distance à l'item actif
-          // (effet smooth car currentIndex change à chaque snap)
-          const isActive  = index === currentIndex;
-          const scale     = isActive ? 1 : SIDE_SCALE;
-          const opacity   = isActive ? 1 : SIDE_OPACITY;
-
-          return (
-            <View key={item.id} style={[styles.slideWrapper]}>
-              <Animated.View
-                style={[
-                  styles.cardOuter,
-                  {
-                    transform: [{ scale }],
-                    opacity,
-                  },
-                ]}
-              >
-                <Image
-                  source={{ uri: item.image }}
-                  style={styles.itemImage}
-                  resizeMode="contain"
-                />
-              </Animated.View>
-            </View>
-          );
-        })}
-      </Animated.View>
-    </View>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   COMPOSANT PRINCIPAL : MenuScreen
-═══════════════════════════════════════════════════ */
 const MenuScreen = ({
   config,
   menuItems,
@@ -185,29 +42,33 @@ const MenuScreen = ({
     });
   };
 
-  const handleIndexChange = (index) => {
-    setCurrentIndex(index);
-    setQuantity(1);
-    setSelectedExtras({ sauces: [], garnitures: [] });
-    setShowSaucePicker(false);
-    setShowGarniturePicker(false);
-  };
+  // ── Scroll handler original ──
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    {
+      useNativeDriver: true,
+      listener: (event) => {
+        const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
+        if (index !== currentIndex && index >= 0 && index < menuItems.length) {
+          setCurrentIndex(index);
+          setQuantity(1);
+          setSelectedExtras({ sauces: [], garnitures: [] });
+          setShowSaucePicker(false);
+          setShowGarniturePicker(false);
+        }
+      },
+    }
+  );
 
   return (
     <>
-      {/* ── HAUT : logo + prix ── */}
+      {/* SECTION HAUT FIXE */}
       <View style={styles.fixedTop}>
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
-            <Image
-              source={{ uri: config.logoUrl }}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <Image source={{ uri: config.logoUrl }} style={styles.logo} />
           ) : (
-            <Text style={styles.brandText}>
-              NINJA <Text style={{ color: '#f97316' }}>FRIES</Text>
-            </Text>
+            <Text style={styles.brandText}>NINJA <Text style={{ color: '#f97316' }}>FRIES</Text></Text>
           )}
         </View>
 
@@ -223,42 +84,67 @@ const MenuScreen = ({
         </View>
       </View>
 
-      {/* ── CARROUSEL PanResponder ── */}
-      {menuItems.length > 0 && (
-        <Carousel
-          items={menuItems}
-          currentIndex={currentIndex}
-          setCurrentIndex={setCurrentIndex}
-          onIndexChange={handleIndexChange}
-        />
-      )}
+      {/* CARROUSEL CENTRAL — version originale exacte */}
+      <View style={styles.carouselContainer}>
+        <Animated.ScrollView
+          horizontal
+          pagingEnabled
+          snapToInterval={ITEM_SIZE}
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingHorizontal: (SCREEN_WIDTH - ITEM_SIZE) / 2 }}
+        >
+          {menuItems.map((item, index) => {
+            const scale = scrollX.interpolate({
+              inputRange: [(index - 1) * ITEM_SIZE, index * ITEM_SIZE, (index + 1) * ITEM_SIZE],
+              outputRange: [0.4, 1.25, 0.4],
+              extrapolate: 'clamp',
+            });
+            const opacity = scrollX.interpolate({
+              inputRange: [(index - 1) * ITEM_SIZE, index * ITEM_SIZE, (index + 1) * ITEM_SIZE],
+              outputRange: [0.3, 1, 0.3],
+              extrapolate: 'clamp',
+            });
+            return (
+              <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+                <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
+                  {/* backgroundColor transparent → PNG affiché sans fond */}
+                  <Image
+                    source={{ uri: item.image }}
+                    style={styles.itemImage}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+              </View>
+            );
+          })}
+        </Animated.ScrollView>
+      </View>
 
-      {/* ── BAS : contrôles ── */}
+      {/* SECTION BAS FIXE */}
       <View style={styles.fixedBottom}>
         <View style={styles.controlsWrapper}>
 
-          {/* [-] NOM [+] */}
+          {/* LIGNE 1 : [-] NOM [+] */}
           <View style={styles.titleRow}>
             <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(-1)}>
               <Text style={styles.titleQtyBtnText}>-</Text>
             </Pressable>
-            <Text style={styles.itemNameText} numberOfLines={1} adjustsFontSizeToFit>
-              {currentItem?.name.toUpperCase()}
-            </Text>
+            <Text style={styles.itemNameText}>{currentItem?.name.toUpperCase()}</Text>
             <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(1)}>
               <Text style={styles.titleQtyBtnText}>+</Text>
             </Pressable>
           </View>
 
-          {/* [SAUCES] (QTÉ) [GARNITURES] */}
+          {/* LIGNE 2 : [SAUCES] (BADGE) [GARNITURES] */}
           <View style={styles.selectorsRow}>
             <Pressable
               style={[styles.selectorBtn, { borderColor: '#f97316' }]}
               onPress={() => { setShowSaucePicker(!showSaucePicker); setShowGarniturePicker(false); }}
             >
-              <Text style={styles.selectorBtnText}>
-                SAUCES ({selectedExtras.sauces.length})
-              </Text>
+              <Text style={styles.selectorBtnText}>SAUCES ({selectedExtras.sauces.length})</Text>
             </Pressable>
 
             <View style={styles.qtyBadgeCenter}>
@@ -273,7 +159,7 @@ const MenuScreen = ({
             </Pressable>
           </View>
 
-          {/* Extras */}
+          {/* EXTRAS DÉPLIÉS */}
           {(showSaucePicker || showGarniturePicker) && (
             <View style={styles.extrasDropdown}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -283,13 +169,12 @@ const MenuScreen = ({
                     onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)}
                     style={[
                       styles.extraItemVertical,
-                      selectedExtras[showSaucePicker ? 'sauces' : 'garnitures']
-                        .find(x => x.id === s.id) && styles.extraItemActive,
+                      selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive,
                     ]}
                   >
                     {s.image
                       ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" />
-                      : <View style={styles.extraImageFallback}><Text style={{ fontSize: 8, color: '#555' }}>IMG</Text></View>
+                      : <View style={styles.extraImageFallback}><Text style={{ fontSize: 8, color: '#555' }}>IMAGE</Text></View>
                     }
                     <Text style={styles.extraItemText}>{s.name.toUpperCase()}</Text>
                     {!showSaucePicker && <Text style={styles.extraPriceText}>+{s.price} F</Text>}
@@ -309,58 +194,24 @@ const MenuScreen = ({
 };
 
 const styles = StyleSheet.create({
-  /* ── Haut ── */
+  // SECTION HAUT FIXE
   fixedTop: { width: '100%', alignItems: 'center', zIndex: 50, paddingBottom: 10 },
   logoWrapper: { width: '100%', alignItems: 'center', marginTop: 10 },
-  logo: { width: 150, height: 80, backgroundColor: 'transparent' },
+  // ↓ resizeMode contain + backgroundColor transparent = logo PNG sans fond
+  logo: { width: 150, height: 80, resizeMode: 'contain', backgroundColor: 'transparent' },
   brandText: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   adminAccess: { position: 'absolute', top: 20, left: 25, zIndex: 100, padding: 10 },
   priceContainer: { height: 80, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
-  price: {
-    fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic',
-    textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15,
-  },
+  price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15 },
   priceUnit: { fontSize: 20, color: '#f97316' },
 
-  /* ── Carrousel ── */
-  carouselViewport: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    overflow: 'hidden',      // cache les items hors écran
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  carouselTrack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // décalage initial pour centrer le premier item
-    paddingLeft: (SCREEN_WIDTH - ITEM_WIDTH) / 2,
-  },
-  slideWrapper: {
-    width: ITEM_WIDTH,
-    height: IMAGE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardOuter: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#f97316',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 12,
-    backgroundColor: 'transparent',
-  },
-  itemImage: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    backgroundColor: 'transparent',   // PNG sans fond
-  },
+  // CARROUSEL CENTRAL — styles originaux exacts
+  carouselContainer: { flex: 1, width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
+  card: { width: CARD_WIDTH, height: CARD_WIDTH, justifyContent: 'center', alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 30, backgroundColor: 'transparent' },
+  // ↓ backgroundColor transparent = PNG affiché sans fond blanc/noir
+  itemImage: { width: '100%', height: '100%', backgroundColor: 'transparent' },
 
-  /* ── Bas ── */
+  // SECTION BAS FIXE
   fixedBottom: { width: '100%', paddingHorizontal: 20, paddingBottom: 20, zIndex: 50 },
   controlsWrapper: { width: '100%', marginBottom: 15 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 15 },
@@ -376,7 +227,7 @@ const styles = StyleSheet.create({
   extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 80, height: 100 },
   extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
   extraItemText: { color: '#fff', fontSize: 10, textAlign: 'center', fontWeight: '900', marginTop: 5 },
-  extraImageSmall: { width: 50, height: 50, backgroundColor: 'transparent' },
+  extraImageSmall: { width: 50, height: 50, backgroundColor: 'transparent', shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
   extraImageFallback: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
   extraPriceText: { color: '#f97316', fontSize: 9, fontWeight: '900' },
   orderBtnBottom: { backgroundColor: '#f97316', width: '100%', padding: 18, borderRadius: 50, alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10 },
@@ -384,4 +235,3 @@ const styles = StyleSheet.create({
 });
 
 module.exports = MenuScreen;
-        
