@@ -2,7 +2,7 @@ const React = require('react');
 const { useRef } = React;
 const {
   View, Text, Image, Pressable,
-  ScrollView, StyleSheet, Animated
+  ScrollView, StyleSheet, Animated, Dimensions
 } = require('react-native');
 
 const { SCREEN_WIDTH, CARD_WIDTH, ITEM_SIZE } = require('../constants');
@@ -31,7 +31,15 @@ const MenuScreen = ({
   const unitPrice   = currentItem ? currentItem.price + extrasPrice : 0;
   const totalPrice  = unitPrice * quantity;
 
+  // ── Copie conforme de l'original ──
   const updateQuantity = (val) => setQuantity((prev) => Math.max(1, prev + val));
+
+  const resetControls = () => {
+    setQuantity(1);
+    setSelectedExtras({ sauces: [], garnitures: [] });
+    setShowSaucePicker(false);
+    setShowGarniturePicker(false);
+  };
 
   const toggleExtra = (type, item) => {
     const list   = selectedExtras[type];
@@ -42,7 +50,7 @@ const MenuScreen = ({
     });
   };
 
-  // ── Scroll handler original ──
+  // ── onScroll original exact ──
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     {
@@ -51,10 +59,7 @@ const MenuScreen = ({
         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_SIZE);
         if (index !== currentIndex && index >= 0 && index < menuItems.length) {
           setCurrentIndex(index);
-          setQuantity(1);
-          setSelectedExtras({ sauces: [], garnitures: [] });
-          setShowSaucePicker(false);
-          setShowGarniturePicker(false);
+          resetControls();
         }
       },
     }
@@ -62,7 +67,7 @@ const MenuScreen = ({
 
   return (
     <>
-      {/* SECTION HAUT FIXE */}
+      {/* ÉLÉMENTS FIXES DU HAUT */}
       <View style={styles.fixedTop}>
         <View style={styles.logoWrapper}>
           {config.logoUrl ? (
@@ -84,7 +89,7 @@ const MenuScreen = ({
         </View>
       </View>
 
-      {/* CARROUSEL CENTRAL — version originale exacte */}
+      {/* CARROUSEL CENTRAL — copie conforme de l'original */}
       <View style={styles.carouselContainer}>
         <Animated.ScrollView
           horizontal
@@ -110,12 +115,7 @@ const MenuScreen = ({
             return (
               <View key={item.id} style={{ width: ITEM_SIZE, alignItems: 'center', justifyContent: 'center' }}>
                 <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
-                  {/* backgroundColor transparent → PNG affiché sans fond */}
-                  <Image
-                    source={{ uri: item.image }}
-                    style={styles.itemImage}
-                    resizeMode="contain"
-                  />
+                  <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="contain" />
                 </Animated.View>
               </View>
             );
@@ -123,11 +123,10 @@ const MenuScreen = ({
         </Animated.ScrollView>
       </View>
 
-      {/* SECTION BAS FIXE */}
+      {/* ZONE DE COMMANDE FIXE EN BAS */}
       <View style={styles.fixedBottom}>
         <View style={styles.controlsWrapper}>
-
-          {/* LIGNE 1 : [-] NOM [+] */}
+          {/* LIGNE 1 : TITRE [-] NOM [+] */}
           <View style={styles.titleRow}>
             <Pressable style={styles.titleQtyBtn} onPress={() => updateQuantity(-1)}>
               <Text style={styles.titleQtyBtnText}>-</Text>
@@ -138,7 +137,7 @@ const MenuScreen = ({
             </Pressable>
           </View>
 
-          {/* LIGNE 2 : [SAUCES] (BADGE) [GARNITURES] */}
+          {/* LIGNE 2 : SÉLECTEURS [SAUCES] (BADGE) [GARNITURES] */}
           <View style={styles.selectorsRow}>
             <Pressable
               style={[styles.selectorBtn, { borderColor: '#f97316' }]}
@@ -159,7 +158,7 @@ const MenuScreen = ({
             </Pressable>
           </View>
 
-          {/* EXTRAS DÉPLIÉS */}
+          {/* CARROUSEL EXTRAS */}
           {(showSaucePicker || showGarniturePicker) && (
             <View style={styles.extrasDropdown}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -167,10 +166,7 @@ const MenuScreen = ({
                   <Pressable
                     key={s.id}
                     onPress={() => toggleExtra(showSaucePicker ? 'sauces' : 'garnitures', s)}
-                    style={[
-                      styles.extraItemVertical,
-                      selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive,
-                    ]}
+                    style={[styles.extraItemVertical, selectedExtras[showSaucePicker ? 'sauces' : 'garnitures'].find(x => x.id === s.id) && styles.extraItemActive]}
                   >
                     {s.image
                       ? <Image source={{ uri: s.image }} style={styles.extraImageSmall} resizeMode="contain" />
@@ -197,7 +193,7 @@ const styles = StyleSheet.create({
   // SECTION HAUT FIXE
   fixedTop: { width: '100%', alignItems: 'center', zIndex: 50, paddingBottom: 10 },
   logoWrapper: { width: '100%', alignItems: 'center', marginTop: 10 },
-  // ↓ resizeMode contain + backgroundColor transparent = logo PNG sans fond
+  // resizeMode contain + backgroundColor transparent → PNG logo sans fond
   logo: { width: 150, height: 80, resizeMode: 'contain', backgroundColor: 'transparent' },
   brandText: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   adminAccess: { position: 'absolute', top: 20, left: 25, zIndex: 100, padding: 10 },
@@ -205,10 +201,9 @@ const styles = StyleSheet.create({
   price: { fontSize: 64, fontWeight: '900', color: '#f97316', fontStyle: 'italic', textShadowColor: 'rgba(249, 115, 22, 0.4)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 15 },
   priceUnit: { fontSize: 20, color: '#f97316' },
 
-  // CARROUSEL CENTRAL — styles originaux exacts
+  // CARROUSEL — styles originaux + backgroundColor transparent sur card et image
   carouselContainer: { flex: 1, width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
   card: { width: CARD_WIDTH, height: CARD_WIDTH, justifyContent: 'center', alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 30, backgroundColor: 'transparent' },
-  // ↓ backgroundColor transparent = PNG affiché sans fond blanc/noir
   itemImage: { width: '100%', height: '100%', backgroundColor: 'transparent' },
 
   // SECTION BAS FIXE
@@ -227,7 +222,7 @@ const styles = StyleSheet.create({
   extraItemVertical: { alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 20, backgroundColor: 'transparent', marginRight: 15, width: 80, height: 100 },
   extraItemActive: { borderColor: '#f97316', borderWidth: 2 },
   extraItemText: { color: '#fff', fontSize: 10, textAlign: 'center', fontWeight: '900', marginTop: 5 },
-  extraImageSmall: { width: 50, height: 50, backgroundColor: 'transparent', shadowColor: "#f97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  extraImageSmall: { width: 50, height: 50, backgroundColor: 'transparent', shadowColor: '#f97316', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
   extraImageFallback: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#18181b', justifyContent: 'center', alignItems: 'center' },
   extraPriceText: { color: '#f97316', fontSize: 9, fontWeight: '900' },
   orderBtnBottom: { backgroundColor: '#f97316', width: '100%', padding: 18, borderRadius: 50, alignItems: 'center', shadowColor: '#f97316', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10 },
@@ -235,3 +230,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = MenuScreen;
+            
