@@ -3,10 +3,10 @@ const { useState, useEffect, useRef } = React;
 const {
   View, Text, Pressable, TextInput, ImageBackground,
   Modal, StyleSheet, SafeAreaView, Animated,
-  KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard,
 } = require('react-native');
 
 const ImagePicker = require('expo-image-picker');
+const FileSystem  = require('expo-file-system');
 
 const { Database }          = require('./Database');
 const { FirestoreService }  = require('./firebase/firestoreService');
@@ -103,15 +103,28 @@ function App() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
-      base64: true,
+      base64: false,   // On n'utilise PAS base64 → pas de conversion JPEG
+      allowsEditing: false,
     });
     if (!result.canceled) {
       const asset    = result.assets[0];
-      const uri      = asset.uri || '';
-      const isPng    = uri.toLowerCase().endsWith('.png')
-                    || (asset.mimeType && asset.mimeType.includes('png'));
-      const mimeType = isPng ? 'image/png' : 'image/jpeg';
-      callback(`data:${mimeType};base64,${asset.base64}`);
+      const srcUri   = asset.uri;
+
+      // Détecter l'extension réelle du fichier
+      const ext      = srcUri.split('.').pop().toLowerCase() || 'png';
+
+      // Copier le fichier dans le répertoire permanent de l'app
+      // → l'URI reste valide même après redémarrage
+      const destUri  = FileSystem.documentDirectory
+                     + 'img_' + Date.now() + '.' + ext;
+      try {
+        await FileSystem.copyAsync({ from: srcUri, to: destUri });
+        callback(destUri);   // on passe l'URI locale directe
+      } catch (e) {
+        console.error('Erreur copie image:', e);
+        // Fallback : utiliser l'URI originale
+        callback(srcUri);
+      }
     }
   };
 
@@ -219,56 +232,31 @@ function App() {
           </Pressable>
         )}
 
-        {/* Modal mot de passe — clavier stable */}
-        <Modal
-          visible={showPassModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowPassModal(false)}
-        >
-          <KeyboardAvoidingView
-            style={styles.modalOverlay}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.modalOverlay}>
-                <Pressable
-                  style={styles.passBox}
-                  onPress={() => {}}
-                >
-                  <IconLock />
-                  <TextInput
-                    secureTextEntry
-                    style={styles.passInput}
-                    value={passwordInput}
-                    onChangeText={setPasswordInput}
-                    placeholder="Code Corporation"
-                    placeholderTextColor="#777"
-                    returnKeyType="done"
-                    onSubmitEditing={checkAdminAccess}
-                    autoFocus={false}
-                    blurOnSubmit={false}
-                  />
-                  <View style={styles.passActions}>
-                    <Pressable
-                      style={styles.cancelBtn}
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        setShowPassModal(false);
-                        setPasswordInput('');
-                      }}
-                    >
-                      <Text style={{ color: 'white', fontWeight: '700' }}>ANNULER</Text>
-                    </Pressable>
-                    <Pressable style={styles.confirmBtn} onPress={checkAdminAccess}>
-                      <Text style={{ color: 'black', fontWeight: '700' }}>ENTRER</Text>
-                    </Pressable>
-                  </View>
+        {/* Modal mot de passe */}
+        <Modal visible={showPassModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.passBox}>
+              <IconLock />
+              <TextInput
+                secureTextEntry
+                style={styles.passInput}
+                value={passwordInput}
+                onChangeText={setPasswordInput}
+                placeholder="Code Corporation"
+                placeholderTextColor="#777"
+                returnKeyType="done"
+                onSubmitEditing={checkAdminAccess}
+              />
+              <View style={styles.passActions}>
+                <Pressable style={styles.cancelBtn} onPress={() => { setShowPassModal(false); setPasswordInput(''); }}>
+                  <Text style={{ color: 'white', fontWeight: '700' }}>ANNULER</Text>
+                </Pressable>
+                <Pressable style={styles.confirmBtn} onPress={checkAdminAccess}>
+                  <Text style={{ color: 'black', fontWeight: '700' }}>ENTRER</Text>
                 </Pressable>
               </View>
-            </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+            </View>
+          </View>
         </Modal>
 
         {/* Panneau admin */}
@@ -316,4 +304,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
-  
+          
