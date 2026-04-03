@@ -16,6 +16,8 @@ const DAILY_COLORS = [
   '#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc'
 ];
 
+const WEBRTC_SIGNAL_PATH = 'webrtc-signals';
+
 module.exports = {
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
@@ -24,4 +26,5 @@ module.exports = {
   CARD_WIDTH,
   ITEM_SIZE,
   DAILY_COLORS,
+  WEBRTC_SIGNAL_PATH,
 };
