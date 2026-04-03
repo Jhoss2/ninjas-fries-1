@@ -23,7 +23,14 @@
         "backgroundColor": "#09090b"
       },
       "package": "com.ninjasfries.app",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,10 +40,14 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermissionDescription": "L'application a besoin du Bluetooth pour imprimer les tickets."
         }
-      ]
+      ],
+      "@config-plugins/react-native-webrtc"
     ]
   }
 }
