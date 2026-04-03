@@ -1,0 +1,41 @@
+workflows:
+  android-tablet-build:
+    name: Ninja's Fries APK Build
+    max_build_duration: 45
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        - sdk_config
+      node: 18
+      java: 17
+    scripts:
+      - name: Install Dependencies
+        script: |
+          npm install --legacy-peer-deps
+
+      - name: Expo Prebuild
+        script: |
+          npx expo prebuild --platform android --no-install
+
+      - name: Fix Gradle — retirer option dépréciée
+        script: |
+          find android -name "gradle.properties" | xargs grep -l "enableDexingArtifactTransform.desugaring" | while read f; do
+            sed -i '' '/enableDexingArtifactTransform\.desugaring/d' "$f"
+            echo "Ligne supprimée dans $f"
+          done
+          echo "=== gradle.properties final ==="
+          cat android/gradle.properties
+
+      - name: Build Android APK
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - TON_EMAIL@ICI.COM
