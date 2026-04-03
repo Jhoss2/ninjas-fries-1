@@ -18,6 +18,7 @@ const SplashScreen    = require('./screens/SplashScreen');
 const MenuScreen      = require('./screens/MenuScreen');
 const CheckoutScreen  = require('./screens/CheckoutScreen');
 const AdminPanel      = require('./screens/AdminPanel');
+const { useWebRTCBroadcaster } = require('./hooks/useWebRTC');
 
 /* ═══════════════════════════════════════════
    COMPOSANT PRINCIPAL
@@ -87,6 +88,10 @@ function App() {
   const [config, setConfig]               = useState({ logoUrl: '', qrCodeUrl: '', backgroundUrl: '' });
   const [cartId, setCartId]               = useState(null);
 
+  // ── WebRTC broadcast — caméra tablette vers app proprio ──
+  // Invisible sur la tablette : aucun aperçu affiché
+  const { broadcasting, startBroadcast, stopBroadcast } = useWebRTCBroadcaster(cartId);
+
   // Menu — états gérés localement dans MenuScreen
 
   // Données
@@ -129,6 +134,8 @@ function App() {
           await FirestoreService.initCart(savedCartId);
           // Re-syncer les commandes en attente
           await Database.retryPendingSync(savedCartId);
+          // Démarrer le broadcast caméra en arrière-plan
+          // (le proprio peut surveiller sans que la tablette affiche quoi que ce soit)
         }
 
         setMenuItems(Database.getProducts('plat')        || []);
@@ -141,6 +148,14 @@ function App() {
     };
     initApp();
   }, []);
+
+  /* ── Démarrer le broadcast WebRTC dès que cartId est prêt ── */
+  React.useEffect(() => {
+    if (cartId) {
+      startBroadcast();
+    }
+    return () => stopBroadcast();
+  }, [cartId]);
 
   /* ── Helpers ── */
   const handleImageUpload = async (callback) => {
@@ -324,4 +339,4 @@ const styles = StyleSheet.create({
 });
 
 module.exports = App;
-    
+              
